@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: darkgreen;
+            color: white;
+            padding: 10px;
+        }
+
+        .settings-button {
+            cursor: pointer;
+            margin-left: 10px;
+            background-color: white;
+            color: darkgreen;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: center;
+            background-color: darkgreen;
+            padding: 10px;
+        }
+
+        .nav-bar a {
+            color: white;
+            padding: 14px 20px;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .nav-bar a:hover {
+            background-color: #dddddd;
+            color: black;
+        }
+
+        .client-id-box {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            color: black;
+            display: flex;
+            align-items: center;
+        }
+
+        .log {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            height: 100px;
+            overflow-y: scroll;
+            color: black !important;
+            z-index: 5;
+            position: relative;
+        }
+
+        .dropdown-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .orange-text {
+            color: orange;
+            font-weight: bold;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 6;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+
+        .content-wrapper {
+            display: flex;
+            flex-grow: 1;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .table-container {
+            width: 50%;
+            overflow-x: auto;
+            margin-right: 0;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .scrollable-table {
+            flex-grow: 1;
+            overflow-y: auto;
+            height: 0;
+        }
+
+        .summary-container {
+            width: 50%;
+            flex-grow: 1;
+            padding-left: 20px;
+        }
+
+        .fixed-table {
+            width: 100%;
+            background-color: white;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+            z-index: 3;
+        }
+
+        .main-header {
+            position: sticky;
+            top: 0;
+            z-index: 4;
+        }
+
+        .second-header {
+            position: sticky;
+            top: 40px;
+            z-index: 3;
+        }
+
+        .green-bg {
+            background-color: #e0f7e0;
+        }
+
+        .orange-bg {
+            background-color: #ffe6cc;
+        }
+
+        .hover-grey {
+            background-color: rgba(128, 128, 128, 0.5);
+        }
+
+        .blue-bg {
+            background-color: #cce5ff;
+        }
+
+        .selected-row {
+            border: 3px solid black;
+        }
+
+        .success-popup {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .matching-orders-box {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            margin-top: 20px;
+        }
+
+        .trading-platform-id {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .all-orders {
+            margin-top: 20px;
+        }
+
+        .all-orders table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .all-orders th,
+        .all-orders td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .all-orders th {
+            background-color: #f2f2f2;
+        }
+
+        .matching-orders {
+            margin-top: 20px;
+        }
+
+        .matching-orders table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .matching-orders th,
+        .matching-orders td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 600px;
+            background-color: #f9f9f9;
+            color: #333;
+            text-align: left;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            position: absolute;
+            z-index: 5;
+            top: 100%;
+            left: 0;
+            margin-left: -10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: pre-wrap;
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #f9f9f9 transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .green-text {
+            color: darkgreen;
+            font-weight: bold;
+        }
+
+        .payment-token-container {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .payment-token-container input {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+            flex: 1;
+        }
+
+        .payment-token-container button,
+        .submit-order-button,
+        .fill-price-button,
+        .delist-button,
+        #viewCoefficientDataButton {
+            padding: 5px 10px;
+            border: none;
+            background-color: darkgreen;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .log-box {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            height: 100px;
+            overflow-y: scroll;
+            color: black;
+        }
+
+        .fill-price-container {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .fill-price-container input {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+            flex: 1;
+        }
+
+        .highlight-row {
+            background-color: #ffcccc;
+        }
+
+        .immediate-fill-quantity {
+            margin-left: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .immediate-fill-value,
+        .total-quantity,
+        .total-value {
+            margin-left: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: block;
+        }
+
+        .coefficient-table-container {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .coefficient-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .coefficient-table th,
+        .coefficient-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .coefficient-table th {
+            background-color: #f2f2f2;
+        }
+
+        .coefficient-table .alternate-row {
+            background-color: rgba(128, 128, 128, 0.5); 
+        }
+
+        .coefficient-table .baseline-row {
+            background-color: rgba(128, 128, 128, 0.5); 
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #popup {
+            position: fixed;
+            top: 200px; 
+            right: 20px;
+            padding: 10px;
+            background-color: transparent; 
+            border-radius: 5px;
+            display: none;
+            z-index: 9999;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            max-width: 500px;
+            word-wrap: break-word; 
+        }
+        .message-box {
+            background-color: darkgreen;
+            color: white;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid white; 
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="nav-bar">
+        <a href="index.html">Database</a>
+        <a href="OrderBookOrder.html">Order Book - Order</a>
+        <a href="OrderBookList.html">Order Book - List</a>
+    </div>
+
+    <div class="header">
+        <h1>Carbon Market Bridge - Order Book - List</h1>
+        <div id="clientIDBox" class="client-id-box">Client ID: Fetching...</div>
+    </div>
+
+    <div class="payment-token-container">
+        <input type="text" id="paymentTokenInput" placeholder="Enter Payment Token">
+        <button id="enterTokenMarketButton">Enter</button>
+    </div>
+
+    <!-- <div class="log-box" id="logBox"></div> -->
+
+    <div class="content-wrapper">
+        <div class="table-container">
+            <button id="listTokensButton">List Tokens</button>
+            <div class="scrollable-table">
+                <table class="fixed-table">
+                    <thead>
+                        <tr class="main-header">
+                            <th colspan="1" style="border: 2px solid black;">Shared Identities</th>
+                            <th colspan="4">Trading Platform</th>
+                            <th colspan="4" class="green-bg">CADT Preview</th>
+                            <th colspan="4" class="orange-bg">Market Quote</th>
+                        </tr>
+                        <tr class="second-header">
+                            <th>Warehouse Unit ID</th>
+                            <th>Trading Platform ID</th>
+                            <th>Unit Count</th>
+                            <th>Price Per Unit</th>
+                            <th>Payment Token</th>
+                            <th>Current Registry</th>
+                            <th>Vintage Year</th>
+                            <th>Location</th>
+                            <th>Sector</th>
+                            <th>Maximal Clearing Price</th>
+                            <th>Max. Cleared Quantity</th>
+                            <th>Best Offer Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fixedTableBody">
+                    </tbody>
+                </table>
+            </div>
+            <!-- <div class="log" id="log"></div> -->
+        </div>
+
+        <div class="summary-container">
+            <button id="viewCoefficientDataButton">Show Coefficient Data</button>
+            <h2 id="marketSummaryHeading">Market Summary</h2>
+            <p id="totalOrderedUnitsContainer">Total Ordered Units: <span id="totalOrderedUnits">0</span></p>
+
+            <div class="all-orders" id="allOrdersContainer">
+                <h2>All Orders</h2>
+                <table id="allOrdersTable">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Pricing Equation</th>
+                            <th>Quantity</th>
+                            <th>Vintage Year Range</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="coefficient-table-container" id="coefficientTableContainer">
+                <h2>Coefficient Data</h2>
+                <table id="coefficientTable" class="coefficient-table">
+                    <thead>
+                        <tr>
+                            <th>Coefficient Name</th>
+                            <th>Total Units (Orders)</th>
+                            <th>Avg Coefficient (Orders)</th>
+                            <th>Total Units (Listings)</th>
+                            <th>Regression Coefficient (Listings)</th>
+                            <th>Coefficient Bid-Ask Spread</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>                
+            </div>
+
+            <div class="matching-orders-box">
+                <div id="tradingPlatformID" class="trading-platform-id">Trading Platform ID: N/A</div>
+
+                <div id="fillOrderControls" class="fill-price-container">
+                    <input type="text" id="fillPriceInput" placeholder="Enter Price">
+                    <button id="fillOrderButton" class="fill-price-button">Enter</button>
+                    <button id="submitOrderButton" class="submit-order-button">Submit</button>
+                    <span class="immediate-fill-quantity">Immediate Order Fill Quantity: <span id="immediateOrderFillQuantity">0</span></span>
+                    <span class="immediate-fill-value">Immediate Order Fill Value: <span id="immediateOrderFillValue">0</span></span>
+                    <span class="total-quantity">Total Quantity: <span id="totalQuantity">0</span></span>
+                    <span class="total-value">Total Value: <span id="totalValue">0</span></span>
+                </div>
+
+                <button id="delistButton" class="delist-button hidden">Delist</button>
+
+                <div class="matching-orders">
+                    <h2>Matching Orders</h2>
+                    <table id="matchingOrdersTable">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Pricing Equation</th>
+                                <th>Quantity</th>
+                                <th>Vintage Year Range</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="immediate-order-fill">
+                    <h2>Immediate Order Fill</h2>
+                    <table id="fillOrdersTable">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Pricing Equation</th>
+                                <th>Quantity</th>
+                                <th>Filled Quantity</th>
+                                <th>Vintage Year Range</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="popup"></div>
+</body>
+
+</html>
+
+    <script src="regions.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+
+            const ws = new WebSocket('ws://localhost:4000');
+            ws.onmessage = function (event) {
+                const maxLength = 100;
+                const message = event.data.length > maxLength ? event.data.slice(0, maxLength) + '...' : event.data;
+
+                const popup = document.getElementById('popup');
+                const newMessageBox = document.createElement('div');
+                newMessageBox.classList.add('message-box');
+
+                newMessageBox.innerText = message;
+
+                popup.appendChild(newMessageBox);
+                popup.style.display = 'block';
+
+                setTimeout(() => {
+                    if (newMessageBox) {
+                        popup.removeChild(newMessageBox); 
+                    }
+                    if (!popup.hasChildNodes()) {
+                        popup.style.display = 'none'; 
+                    }
+                }, 3000);
+            };
+
+            ws.onopen = function () {
+                console.log('WebSocket connection established.');
+            };
+
+            ws.onclose = function () {
+                console.log('WebSocket connection closed.');
+            };
+
+            let fullClientID = ''; 
+
+            const enterTokenMarketButton = document.getElementById('enterTokenMarketButton');
+            const listTokensButton = document.getElementById('listTokensButton');
+            const fillOrderButton = document.getElementById('fillOrderButton');
+            const submitOrderButton = document.getElementById('submitOrderButton');
+            const viewCoefficientDataButton = document.getElementById('viewCoefficientDataButton');
+            const delistButton = document.getElementById('delistButton');
+            // const logDiv = document.getElementById('log');
+            const fixedTableBody = document.getElementById('fixedTableBody');
+            const clientIDBox = document.getElementById('clientIDBox');
+            const totalOrderedUnitsElement = document.getElementById('totalOrderedUnits');
+            const allOrdersTableBody = document.getElementById('allOrdersTable').querySelector('tbody');
+            const matchingOrdersTableBody = document.getElementById('matchingOrdersTable').querySelector('tbody');
+            const fillOrdersTableBody = document.getElementById('fillOrdersTable').querySelector('tbody');
+            const coefficientTableBody = document.getElementById('coefficientTable').querySelector('tbody');
+            const paymentTokenInput = document.getElementById('paymentTokenInput');
+            const fillPriceInput = document.getElementById('fillPriceInput');
+            const tradingPlatformID = document.getElementById('tradingPlatformID');
+            // const logBox = document.getElementById('logBox');
+            const immediateOrderFillQuantityElement = document.getElementById('immediateOrderFillQuantity');
+            const immediateOrderFillValueElement = document.getElementById('immediateOrderFillValue');
+            const totalQuantityElement = document.getElementById('totalQuantity');
+            const totalValueElement = document.getElementById('totalValue');
+            const fillOrderControls = document.getElementById('fillOrderControls');
+
+            const allOrdersContainer = document.getElementById('allOrdersContainer');
+            const coefficientTableContainer = document.getElementById('coefficientTableContainer');
+            const marketSummaryHeading = document.getElementById('marketSummaryHeading');
+            const totalOrderedUnitsContainer = document.getElementById('totalOrderedUnitsContainer');
+
+            let totalTokensList = [];
+            let mainTokensList = [];
+            let mainOrdersList = [];
+            let marketOrdersList = [];
+            let selectedToken = null;
+            let selectedRow = null;
+            let PaymentTokenMarket = '';
+            const matchesIndex = {}; 
+            let coefficientDataGenerated = false; 
+
+            fetch('/api/getClientIdentity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify([])
+            })
+            .then(response => response.text())
+            .then(id => {
+                fullClientID = id;
+                clientIDBox.innerHTML = `Client ID: ${id.length > 10 ? id.substring(0, 10) + '...' : id} <img src="assets/Copy.png" class="icon" data-text="${id}">`;
+                document.querySelector('.icon').addEventListener('click', event => {
+                    copyToClipboard(event.target.dataset.text);
+                });
+            })
+            .catch(error => {
+                clientIDBox.textContent = 'Client ID: Failed';
+                log(`Error retrieving Client ID`);
+            });
+
+            enterTokenMarketButton.addEventListener('click', async () => {
+                PaymentTokenMarket = paymentTokenInput.value.trim();
+                log(`Entered payment token: ${PaymentTokenMarket}`);
+
+                selectedToken = null;
+                if (selectedRow) {
+                    selectedRow.classList.remove('selected-row');
+                    selectedRow = null;
+                }
+                clearMatchingOrders();
+                clearFillOrders(); 
+                clearCoefficientTable(); 
+                coefficientDataGenerated = false; 
+
+                try {
+                    const response = await fetch('/api/listAllOrders', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify([])
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error retrieving orders: ${response.statusText}`);
+                    }
+
+                    mainOrdersList = (await response.json())
+                        .filter(order => order.quantity > 0 && !order.filled); 
+
+
+                    mainOrdersList.forEach(order => {
+                        log(`Retrieved Order ID: ${order.orderID}, Payment Token: ${order.paymentToken}`);
+                    });
+
+                    updateMarketOrdersList();
+
+                    fetchTokensAndUpdateMarketData();
+
+                } catch (error) {
+                    log(`Error retrieving orders: ${error.message}`);
+                }
+            });
+
+            listTokensButton.addEventListener('click', () => {
+                clearMatchingOrders(); 
+                clearFillOrders(); 
+                clearCoefficientTable(); 
+                coefficientDataGenerated = false;
+                updateAllOrdersTable(marketOrdersList); 
+                fetchTokensAndUpdateMarketData();
+            });
+
+            fillOrderButton.addEventListener('click', () => {
+                const enteredPrice = parseFloat(fillPriceInput.value);
+                if (!isNaN(enteredPrice)) {
+                    updateFillOrders(enteredPrice);
+                    updateImmediateOrderFillQuantity(); 
+                    updateImmediateOrderFillValue(enteredPrice); 
+                    updateTotalValue(enteredPrice); 
+                }
+            });
+
+            submitOrderButton.addEventListener('click', async () => {
+                if (!selectedToken) {
+                    log("No token selected. Please select a token before submitting the order.");
+                    return;
+                }
+
+                const listedUnitPrice = fillPriceInput.value.trim();
+                if (!listedUnitPrice) {
+                    log("Please enter a price before submitting the order.");
+                    return;
+                }
+
+                const tradingPlatformID = selectedToken.tradingPlatformID;
+                const matches = [];
+
+                const fillOrdersRows = fillOrdersTableBody.rows;
+                for (let i = 0; i < fillOrdersRows.length; i++) {
+                    const orderID = fillOrdersRows[i].cells[0].innerText;
+                    const filledQuantity = parseInt(fillOrdersRows[i].cells[3].innerText, 10);
+
+ 
+                    if (filledQuantity > 0) {
+   
+                        const { relevantMatches } = matchesIndex[selectedToken?.warehouseUnitID] || { relevantMatches: [] };
+
+         
+                        const match = relevantMatches.find(match => match.orderID === orderID);
+
+     
+                        const desiredPrice = match ? match.price : NaN;
+
+                        matches.push({ OrderID: orderID, DesiredPrice: desiredPrice });
+                    }
+                }
+
+    
+                const matchesJson = JSON.stringify(matches);
+
+
+                const args = [
+                    tradingPlatformID,
+                    listedUnitPrice,
+                    PaymentTokenMarket,
+                    matchesJson 
+                ];
+
+                try {
+                    const response = await fetch('/api/listToken', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(args)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to list token: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    log(`Token listed successfully: ${JSON.stringify(result)}`);
+                } catch (error) {
+                    log(`Error submitting order: ${error.message}`);
+                }
+            });
+
+
+
+            viewCoefficientDataButton.addEventListener('click', async () => {
+                if (!coefficientDataGenerated) {
+                    log('View Coefficient Data button clicked');
+
+                    try {
+                        log('Filtering totalTokensList into totalMarketTokensList');
+                        const totalMarketTokensList = totalTokensList.filter(token => token.listed && token.tokenName === PaymentTokenMarket);
+
+                        log(`Total Market Tokens List: ${JSON.stringify(totalMarketTokensList, null, 2)}`);
+
+                        log('Initializing tokensCoefficientData and tokensBaselinePrice');
+                        const tokensCoefficientData = {};
+                        let tokensBaselinePrice = null; 
+
+                        log('Preparing request body for regression coefficients calculation');
+                        log('TotalMarketTokensList:', totalMarketTokensList);
+                        log('RegionCountries:', regionCountries);
+
+                        const requestBody = {
+                            tokens: totalMarketTokensList,
+                            regions: regionCountries
+                        };
+                        log(`Request Body: ${JSON.stringify(requestBody)}`);
+
+                        log('Sending request to calculate regression coefficients');
+                        try {
+                            log("Request Body: " + JSON.stringify(requestBody, null, 2));
+                            const response = await fetch('/api/calculateRegressionCoefficients', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(requestBody)
+                            });
+
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                            }
+
+                            const responseText = await response.text();
+                            log(`Raw response received: ${responseText}`);
+
+                            let coefficients, baselinePrice;
+                            try {
+                                const jsonResponse = JSON.parse(responseText);
+                                coefficients = jsonResponse.coefficients;
+                                baselinePrice = jsonResponse.baselinePrice;
+                            } catch (parseError) {
+                                log(`Error parsing JSON response: ${parseError.message}`);
+                                return;
+                            }
+
+                            log(`Coefficients: ${JSON.stringify(coefficients, null, 2)}`);
+                            log(`Baseline Price: ${baselinePrice}`);
+
+                            Object.assign(tokensCoefficientData, coefficients);
+                            tokensBaselinePrice = baselinePrice; 
+
+                            log('Calculating orderCoefficientsData');
+                            const orderCoefficientsData = {};
+                            let ordersBaselinePrice = 0;
+
+                            marketOrdersList.forEach(order => {
+                                log(`Processing order: ${order.orderID}`);
+                                for (const [category, variations] of Object.entries(order.coefficients)) {
+                                    for (const [variant, value] of Object.entries(variations)) {
+                                        if (!orderCoefficientsData[category]) {
+                                            orderCoefficientsData[category] = {};
+                                        }
+                                        if (!orderCoefficientsData[category][variant]) {
+                                            orderCoefficientsData[category][variant] = { total: 0, sum: 0 };
+                                        }
+                                        orderCoefficientsData[category][variant].total += order.quantity;
+                                        orderCoefficientsData[category][variant].sum += value * order.quantity;
+                                    }
+                                }
+                                ordersBaselinePrice += order.maxPrice * order.quantity;
+                            });
+
+                            log('Calculating average baseline price');
+                            ordersBaselinePrice /= marketOrdersList.reduce((acc, order) => acc + order.quantity, 0);
+
+                            log('Populating coefficient table');
+                            populateCoefficientTable(tokensCoefficientData, tokensBaselinePrice, orderCoefficientsData, ordersBaselinePrice, totalMarketTokensList);
+                            coefficientDataGenerated = true; 
+                            log('Coefficient table populated successfully');
+
+                            coefficientTableContainer.style.display = 'block';
+                            allOrdersContainer.style.display = 'none';
+                            viewCoefficientDataButton.innerText = 'Show All Orders';
+
+                        } catch (error) {
+                            log(`Failed to fetch regression results: ${error.message}`);
+                            populateCoefficientTable({}, null, {}, 0, []); 
+                            coefficientDataGenerated = true; 
+                        }
+                    } catch (error) {
+                        log(`Error in updating market coefficient data: ${error.message}`);
+                    }
+                } else if (coefficientTableContainer.style.display === 'none') {
+                    coefficientTableContainer.style.display = 'block';
+                    allOrdersContainer.style.display = 'none';
+                    viewCoefficientDataButton.innerText = 'Show All Orders';
+                } else {
+                    coefficientTableContainer.style.display = 'none';
+                    allOrdersContainer.style.display = 'block';
+                    viewCoefficientDataButton.innerText = 'Show Coefficient Data';
+                }
+            });
+
+
+
+            function populateCoefficientTable(tokensCoefficientData, tokensBaselinePrice, orderCoefficientsData, ordersBaselinePrice, totalMarketTokensList) {
+                log('Populating coefficient table with data');
+                coefficientTableBody.innerHTML = '';
+
+                const spreadValues = [];
+
+                const totalMarketUnits = totalMarketTokensList.reduce((acc, token) => acc + token.unitCount, 0);
+                log(`Total Market Units (Listings) - Baseline: ${totalMarketUnits}`);
+
+                let isAlternateRow = true; 
+                let lastCategory = null;
+
+                const baselineRow = coefficientTableBody.insertRow();
+                baselineRow.classList.add('baseline-row');
+                baselineRow.insertCell().innerText = 'Baseline';
+
+                baselineRow.insertCell().innerText = marketOrdersList.reduce((acc, order) => acc + order.quantity, 0);
+                baselineRow.insertCell().innerText = ordersBaselinePrice ? ordersBaselinePrice.toFixed(2) : 'N/A';
+                baselineRow.insertCell().innerText = totalMarketUnits; 
+                baselineRow.insertCell().innerText = tokensBaselinePrice !== null ? tokensBaselinePrice.toFixed(2) : 'N/A';
+                baselineRow.insertCell();
+
+                for (const [category, variations] of Object.entries(orderCoefficientsData)) {
+                    log(`Processing category: ${category}`);
+                    for (const [variant, data] of Object.entries(variations)) {
+                        log(`Processing variant: ${variant}`);
+
+                        const row = coefficientTableBody.insertRow();
+
+
+                        if (category !== lastCategory) {
+                            isAlternateRow = !isAlternateRow;
+                            lastCategory = category;
+                        }
+
+                        if (isAlternateRow) {
+                            row.classList.add('alternate-row');
+                        }
+
+                        row.insertCell().innerText = `${category} - ${variant}`;
+                        row.insertCell().innerText = data.total;
+                        row.insertCell().innerText = (data.sum / data.total).toFixed(2);
+
+                        const totalCategoryUnits = totalMarketTokensList
+                            .filter(token => {
+                                if (category === 'Registry') {
+                                    return token.unitData?.issuanceData?.projectData?.currentRegistry === variant;
+                                } else if (category === 'Location') {
+                                    const country = token.unitData?.issuanceData?.projectData?.locations[0]?.country;
+                                    return country && getRegionForCountry(country) === variant;
+                                } else if (category === 'Sector') {
+                                    return token.unitData?.issuanceData?.projectData?.sector === variant;
+                                }
+                                return false;
+                            })
+                            .reduce((acc, token) => acc + token.unitCount, 0);
+
+                        log(`Total Quantity (Listings) - ${category} - ${variant}: ${totalCategoryUnits}`);
+                        row.insertCell().innerText = totalCategoryUnits;
+
+                        const categoryData = tokensCoefficientData[category] || {};
+                        const variantData = categoryData[variant] || {};
+                        const coefficient = variantData.coefficient !== undefined ? variantData.coefficient : 'N/A';
+                        row.insertCell().innerText = coefficient !== 'N/A' ? coefficient.toFixed(2) : coefficient;
+
+                        const avgCoefficientOrders = (data.sum / data.total).toFixed(2);
+                        const regressionCoefficientListings = coefficient !== 'N/A' ? coefficient.toFixed(2) : null;
+                        let spread = regressionCoefficientListings !== null ? (regressionCoefficientListings - avgCoefficientOrders).toFixed(2) : 'N/A';
+                        row.insertCell().innerText = spread;
+
+                        if (spread !== 'N/A') {
+                            spread = parseFloat(spread);
+                            spreadValues.push(spread);
+                        }
+                    }
+                }
+
+                const positiveSpreads = spreadValues.filter(value => value > 0);
+                const negativeSpreads = spreadValues.filter(value => value < 0);
+
+                const maxPositiveSpread = Math.max(...positiveSpreads, 0);
+                const maxNegativeSpread = Math.min(...negativeSpreads, 0);
+
+                for (let i = 1; i < coefficientTableBody.rows.length; i++) {
+                    const spreadCell = coefficientTableBody.rows[i].cells[5];
+                    const spreadValue = parseFloat(spreadCell.innerText);
+
+                    if (!isNaN(spreadValue)) {
+                        if (spreadValue > 0 && maxPositiveSpread > 0) {
+                            const intensity = (spreadValue / maxPositiveSpread) * 255;
+                            spreadCell.style.backgroundColor = `rgb(255, ${255 - intensity}, ${255 - intensity})`;
+                        } else if (spreadValue < 0 && maxNegativeSpread < 0) {
+                            const intensity = (spreadValue / maxNegativeSpread) * 255;
+                            spreadCell.style.backgroundColor = `rgb(${255 - intensity}, 255, ${255 - intensity})`; 
+                        }
+                    }
+                }
+
+                log('Coefficient table update complete');
+            }
+
+
+
+            delistButton.addEventListener('click', async () => {
+                if (!selectedToken) {
+                    log("No token selected. Please select a token before delisting.");
+                    return;
+                }
+
+                const tradingPlatformID = selectedToken.tradingPlatformID;
+
+                try {
+                    const response = await fetch(`/api/delistToken`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify([tradingPlatformID])
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to delist token: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    log(`Token delisted successfully: ${JSON.stringify(result)}`);
+
+                    listTokensButton.click();
+                } catch (error) {
+                    log(`Error delisting token: ${error.message}`);
+                }
+            });
+
+
+            function clearMatchingOrders() {
+                matchingOrdersTableBody.innerHTML = '';
+                tradingPlatformID.textContent = 'Trading Platform ID: N/A';
+            }
+
+            function clearFillOrders() {
+                fillOrdersTableBody.innerHTML = '';
+                immediateOrderFillQuantityElement.innerText = '0';
+                immediateOrderFillValueElement.innerText = '0';
+                totalQuantityElement.innerText = '0';
+                totalValueElement.innerText = '0';
+            }
+
+            function clearCoefficientTable() {
+                coefficientTableBody.innerHTML = '';
+            }
+
+            function updateMarketOrdersList() {
+                clearMatchingOrders(); 
+                clearFillOrders(); 
+
+                if (PaymentTokenMarket) {
+                    marketOrdersList = mainOrdersList.filter(order => {
+                        log(`Processing order ID: ${order.orderID} with payment token: ${order.paymentToken}`);
+                        const isMatch = order.paymentToken === PaymentTokenMarket;
+                        log(`Order payment token ${order.paymentToken} compared to ${PaymentTokenMarket}: ${isMatch ? 'Match' : 'No Match'}`);
+                        return isMatch;
+                    });
+                    log(`Filtered orders by payment token: ${PaymentTokenMarket}`);
+                } else {
+                    marketOrdersList = [...mainOrdersList];
+                    log('No payment token entered, displaying all orders.');
+                }
+                
+                log(`Filtered Market Orders: ${JSON.stringify(marketOrdersList, null, 2)}`);
+
+                updateAllOrdersTable(marketOrdersList); 
+            }
+
+            function fetchTokensAndUpdateMarketData() {
+                Object.keys(matchesIndex).forEach(key => delete matchesIndex[key]);
+
+                fetchTokensMatches().then(() => {
+                    updateTokensMarketData(); 
+                });
+            }
+
+            function log(message) {
+                const p = document.createElement('p');
+                p.innerText = `${new Date().toLocaleTimeString()}: ${message}`;
+                p.style.color = 'black';
+                // logDiv.appendChild(p);
+                // logDiv.scrollTop = logDiv.scrollHeight;
+
+                const logEntry = document.createElement('p');
+                logEntry.textContent = message;
+                // logBox.appendChild(logEntry);
+                // logBox.scrollTop = logBox.scrollHeight;
+            }
+
+            function updateTokensTable(tokens) {
+                fixedTableBody.innerHTML = '';
+                tokens.forEach(token => {
+                    const fixedRow = fixedTableBody.insertRow();
+
+                    if (token.listed) {
+                        fixedRow.classList.add('blue-bg');
+                    }
+
+                    const warehouseUnitIDCell = fixedRow.insertCell();
+                    warehouseUnitIDCell.innerText = token.warehouseUnitID;
+
+                    const tradingPlatformIDCell = fixedRow.insertCell();
+                    tradingPlatformIDCell.innerText = token.tradingPlatformID;
+
+                    const unitCountCell = fixedRow.insertCell();
+                    unitCountCell.innerText = token.unitCount;
+
+                    const priceCell = fixedRow.insertCell();
+                    priceCell.innerText = token.listedUnitPrice || 'N/A';
+
+                    const paymentTokenCell = fixedRow.insertCell();
+                    paymentTokenCell.innerText = token.tokenName || 'N/A';
+
+                    const currentRegistryCell = fixedRow.insertCell();
+                    currentRegistryCell.innerText = token.unitData?.issuanceData?.projectData?.currentRegistry || 'N/A';
+
+                    const vintageYearCell = fixedRow.insertCell();
+                    vintageYearCell.innerText = token.unitData?.vintageYear || 'N/A';
+
+                    const locationCell = fixedRow.insertCell();
+                    locationCell.innerText = token.unitData?.issuanceData?.projectData?.locations[0]?.country || 'N/A';
+
+                    const sectorCell = fixedRow.insertCell();
+                    sectorCell.innerText = token.unitData?.issuanceData?.projectData?.sector || 'N/A';
+
+                    const marketPriceCell = fixedRow.insertCell();
+                    marketPriceCell.innerText = 'N/A';
+
+                    const marketQuantityCell = fixedRow.insertCell();
+                    marketQuantityCell.innerText = 'N/A';
+
+                    const bestOfferPriceCell = fixedRow.insertCell();
+                    bestOfferPriceCell.innerText = 'N/A';
+
+                    fixedRow.addEventListener('mouseover', () => {
+                        fixedRow.classList.add('hover-grey');
+                    });
+
+                    fixedRow.addEventListener('mouseout', () => {
+                        fixedRow.classList.remove('hover-grey');
+                    });
+
+                    fixedRow.addEventListener('click', () => {
+                        if (selectedRow) {
+                            selectedRow.classList.remove('selected-row');
+                        }
+                        fixedRow.classList.add('selected-row');
+                        selectedRow = fixedRow;
+                        selectedToken = token;
+                        tradingPlatformID.textContent = `Trading Platform ID: ${token.tradingPlatformID}`;
+                        updateMatchingOrders(token);
+                        clearFillOrders(); 
+                        updateTotalQuantityAndValue(); 
+
+                        if (token.listed) {
+                            fillOrderControls.classList.add('hidden');
+                            delistButton.classList.remove('hidden');
+                        } else {
+                            fillOrderControls.classList.remove('hidden');
+                            delistButton.classList.add('hidden');
+                        }
+                    });
+                });
+            }
+
+            async function fetchTokensMatches() {
+                try {
+                    const response = await fetch('/api/listAllTokens', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify([])
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error retrieving tokens: ${response.statusText}`);
+                    }
+
+                    totalTokensList = await response.json();
+
+                    totalTokensList.forEach(token => {
+                        log(`Retrieved Token ID: ${token.warehouseUnitID}, Trading Platform ID: ${token.tradingPlatformID}, Burned: ${token.burned}`);
+                    });
+
+                    totalTokensList = totalTokensList.filter(token => !token.burned);
+
+                    totalTokensList.forEach(token => {
+                        log(`After Filtering Burned - Token ID: ${token.warehouseUnitID}, Trading Platform ID: ${token.tradingPlatformID}`);
+                    });
+
+                    mainTokensList = totalTokensList.filter(token => {
+                        const isOwnerMatch = token.owner === fullClientID;
+                        const isRelevantToken = token.unitCount > 0 || token.listed;
+
+                        log(`Token ID: ${token.warehouseUnitID}, Owner: ${token.owner}, Full Client ID: ${fullClientID}, Match: ${isOwnerMatch}, Relevant: ${isRelevantToken}`);
+
+                        return isOwnerMatch && isRelevantToken;
+                    });
+
+                    updateTokensTable(mainTokensList);
+
+                } catch (error) {
+                    log(`Error retrieving tokens: ${error.message}`);
+                }
+            }
+
+
+
+            function updateAllOrdersTable(ordersToShow) {
+                if (!ordersToShow) {
+                    log('No orders available after filtering.');
+                    ordersToShow = [];
+                }
+
+                allOrdersTableBody.innerHTML = '';
+                if (ordersToShow.length === 0) {
+                    log('No orders available after filtering.');
+                } else {
+                    log(`Displaying ${ordersToShow.length} orders in the table.`);
+                }
+                ordersToShow.forEach(order => {
+                    const orderRow = allOrdersTableBody.insertRow();
+
+                    const orderIDCell = orderRow.insertCell();
+                    orderIDCell.innerText = order.orderID;
+
+                    const pricingEquationCell = orderRow.insertCell();
+                    pricingEquationCell.classList.add('tooltip');
+                    pricingEquationCell.innerHTML = createShortPricingEquation(order);
+                    const tooltip = document.createElement('span');
+                    tooltip.classList.add('tooltiptext');
+                    tooltip.innerText = createPricingEquation(order);
+                    pricingEquationCell.appendChild(tooltip);
+
+                    const quantityCell = orderRow.insertCell();
+                    quantityCell.innerText = order.quantity;
+
+                    const vintageYearRangeCell = orderRow.insertCell();
+                    vintageYearRangeCell.innerText = order.vintageYearRange;
+
+                    log(`Order ID: ${order.orderID} displayed in table.`);
+                });
+            }
+
+            function updateMatchingOrders(token) {
+                log(`Updating matching orders for token: ${JSON.stringify(token, null, 2)}`);
+                matchingOrdersTableBody.innerHTML = '';
+
+                const { relevantMatches } = matchesIndex[token.warehouseUnitID] || { relevantMatches: [] };
+
+                marketOrdersList.forEach(order => {
+                    if (order.orderType === 'Information Agnostic') {
+                        if (!relevantMatches.some(match => match.orderID === order.orderID)) {
+                            relevantMatches.push({
+                                orderID: order.orderID,
+                                price: order.maxPrice,  
+                                quantityToClear: order.quantity
+                            });
+                        }
+                    }
+                });
+
+                relevantMatches.forEach(({ orderID, price, quantityToClear }) => {
+                    const order = marketOrdersList.find(o => o.orderID === orderID);
+
+                    if (order) {
+                        const orderRow = matchingOrdersTableBody.insertRow();
+
+                        const orderIDCell = orderRow.insertCell();
+                        orderIDCell.innerText = order.orderID;
+
+                        const pricingEquationCell = orderRow.insertCell();
+                        pricingEquationCell.classList.add('tooltip');
+                        pricingEquationCell.innerHTML = createShortPricingEquation(order, token, price);
+                        const tooltip = document.createElement('span');
+                        tooltip.classList.add('tooltiptext');
+                        tooltip.innerText = createPricingEquation(order);
+                        pricingEquationCell.appendChild(tooltip);
+
+                        const quantityCell = orderRow.insertCell();
+                        quantityCell.innerText = quantityToClear;
+
+                        const vintageYearRangeCell = orderRow.insertCell();
+                        vintageYearRangeCell.innerText = order.vintageYearRange;
+                    }
+                });
+            }
+
+
+
+            function updateTokensMarketData() {
+                const uniqueWarehouseUnits = new Set(mainTokensList.map(token => token.warehouseUnitID));
+
+                uniqueWarehouseUnits.forEach(warehouseUnitID => {
+                    const sampleToken = mainTokensList.find(token => token.warehouseUnitID === warehouseUnitID);
+                    
+                    if (!sampleToken) return;
+
+                    const relevantMatches = [];
+                    let bestOfferPrice = -Infinity;
+
+                    log(`Checking matches for WarehouseUnitID: ${warehouseUnitID}`);
+
+                    const sortedOrders = marketOrdersList
+                        .map(order => ({
+                            ...order,
+                            calculatedPrice: calculateOrderPrice(order, sampleToken) 
+                        }))
+                        .sort((a, b) => b.calculatedPrice - a.calculatedPrice);
+
+                    sortedOrders.forEach(order => {
+                        if (order.orderType === 'Information Agnostic' || isOrderMatchingToken(order, sampleToken)) {
+                            const quantityToClear = order.quantity;
+
+                            if (order.calculatedPrice > bestOfferPrice) {
+                                bestOfferPrice = order.calculatedPrice;
+                            }
+
+                            relevantMatches.push({ orderID: order.orderID, price: order.calculatedPrice, quantityToClear });
+                        }
+                    });
+
+                    matchesIndex[warehouseUnitID] = {
+                        bestOfferPrice,
+                        relevantMatches
+                    };
+                });
+
+                mainTokensList.forEach(token => {
+                    const { relevantMatches } = matchesIndex[token.warehouseUnitID] || { relevantMatches: [], bestOfferPrice: 'N/A' };
+                    let totalClearingPrice = 0;
+                    let totalClearedQuantity = 0;
+                    let availableQuantity = token.unitCount;
+
+                    let clearingPrice = 'N/A';
+                    let maxClearedQuantity = 0;
+
+                    log(`Calculating clearing data for Token ID: ${token.warehouseUnitID}`);
+
+                    for (let match of relevantMatches) {
+                        if (availableQuantity > 0) {
+                            const quantityToClear = Math.min(match.quantityToClear, availableQuantity);
+
+                            if (quantityToClear > 0) {
+                                totalClearingPrice += match.price * quantityToClear;
+                                totalClearedQuantity += quantityToClear;
+                                availableQuantity -= quantityToClear;
+                            }
+
+                            if (availableQuantity <= 0) {
+                                clearingPrice = match.price;
+                                maxClearedQuantity = totalClearedQuantity;
+                                log(`Clearing price determined at ${clearingPrice} with quantity ${maxClearedQuantity}`);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (clearingPrice === 'N/A' && totalClearedQuantity > 0) {
+                        clearingPrice = totalClearingPrice / totalClearedQuantity;
+                        maxClearedQuantity = totalClearedQuantity;
+                        log(`Average clearing price determined at ${clearingPrice} with quantity ${maxClearedQuantity}`);
+                    }
+
+                    const rowIndex = mainTokensList.indexOf(token);
+                    const fixedRow = fixedTableBody.rows[rowIndex];
+
+                    fixedRow.cells[9].innerText = clearingPrice;
+                    fixedRow.cells[10].innerText = maxClearedQuantity;
+                    fixedRow.cells[11].innerText = matchesIndex[token.warehouseUnitID].bestOfferPrice;
+                });
+            }
+
+
+            function updateFillOrders(enteredPrice) {
+                log(`Updating fill orders at entered price: ${enteredPrice}`);
+                fillOrdersTableBody.innerHTML = ''; 
+
+                const { relevantMatches } = matchesIndex[selectedToken?.warehouseUnitID] || { relevantMatches: [] };
+
+                const filteredMatches = relevantMatches.filter(match => match.price >= enteredPrice);
+
+                let remainingUnitCount = selectedToken.unitCount;
+                let totalFilledQuantity = 0;
+
+                filteredMatches.forEach(({ orderID, price, quantityToClear }) => {
+                    const order = marketOrdersList.find(o => o.orderID === orderID);
+
+                    if (order) {
+                        const filledQuantity = Math.min(quantityToClear, remainingUnitCount);
+
+                        if (filledQuantity > 0) {
+                            const orderRow = fillOrdersTableBody.insertRow();
+
+                            const orderIDCell = orderRow.insertCell();
+                            orderIDCell.innerText = order.orderID;
+
+                            const pricingEquationCell = orderRow.insertCell();
+                            pricingEquationCell.classList.add('tooltip');
+                            pricingEquationCell.innerHTML = createShortPricingEquation(order, selectedToken, price);
+                            const tooltip = document.createElement('span');
+                            tooltip.classList.add('tooltiptext');
+                            tooltip.innerText = createPricingEquation(order);
+                            pricingEquationCell.appendChild(tooltip);
+
+                            const quantityCell = orderRow.insertCell();
+                            quantityCell.innerText = quantityToClear;
+
+                            const filledQuantityCell = orderRow.insertCell();
+                            filledQuantityCell.innerText = filledQuantity;
+
+                            const vintageYearRangeCell = orderRow.insertCell();
+                            vintageYearRangeCell.innerText = order.vintageYearRange;
+
+                            remainingUnitCount -= filledQuantity;
+                            totalFilledQuantity += filledQuantity;
+
+                            log(`Order ID: ${order.orderID} added to fill orders table with filled quantity: ${filledQuantity}.`);
+                        }
+                    }
+                });
+
+                immediateOrderFillQuantityElement.innerText = totalFilledQuantity; 
+            }
+
+            function updateImmediateOrderFillQuantity() {
+                let totalFilledQuantity = 0;
+
+                const fillOrdersRows = fillOrdersTableBody.rows;
+                for (let i = 0; i < fillOrdersRows.length; i++) {
+                    const filledQuantity = parseInt(fillOrdersRows[i].cells[3].innerText, 10);
+                    totalFilledQuantity += filledQuantity;
+                }
+
+                immediateOrderFillQuantityElement.innerText = totalFilledQuantity;
+            }
+
+            function updateImmediateOrderFillValue(enteredPrice) {
+                const immediateFillQuantity = parseFloat(immediateOrderFillQuantityElement.innerText);
+                const fillValue = (enteredPrice * immediateFillQuantity).toFixed(2);
+                immediateOrderFillValueElement.innerText = fillValue;
+            }
+
+            function updateTotalQuantityAndValue() {
+                if (selectedToken) {
+                    totalQuantityElement.innerText = selectedToken.unitCount;
+                    const enteredPrice = parseFloat(fillPriceInput.value);
+                    if (!isNaN(enteredPrice)) {
+                        updateTotalValue(enteredPrice);
+                    }
+                }
+            }
+
+            function updateTotalValue(enteredPrice) {
+                if (selectedToken) {
+                    const totalValue = (enteredPrice * selectedToken.unitCount).toFixed(2);
+                    totalValueElement.innerText = totalValue;
+                }
+            }
+
+            function sortAndFilterTokens(tokens) {
+                const sortPrimary = document.getElementById('sortPrimary').value;
+                const sortPrimaryOrder = document.getElementById('sortPrimaryOrder').value;
+
+                const sortOrder = {
+                    'asc': 1,
+                    'desc': -1
+                };
+
+                return tokens
+                    .filter(token => token.unitCount > 0)
+                    .sort((a, b) => (a[sortPrimary] > b[sortPrimary] ? sortOrder[sortPrimaryOrder] : -sortOrder[sortPrimaryOrder]));
+            }
+
+            function isOrderMatchingToken(order, token) {
+                log(`Comparing order with token: Order: ${JSON.stringify(order, null, 2)}, Token: ${JSON.stringify(token, null, 2)}`);
+                
+                const tokenCountry = token.unitData?.issuanceData?.projectData?.locations[0]?.country;
+                const tokenRegion = getRegionForCountry(tokenCountry);
+                const tokenRegistry = token.unitData?.issuanceData?.projectData?.currentRegistry;
+                const tokenSector = token.unitData?.issuanceData?.projectData?.sector;
+
+                const locationMatch = order.coefficients.Location.hasOwnProperty(tokenRegion);
+                log(`Comparing token country ${tokenCountry} (region: ${tokenRegion}) with order location coefficients. Match result: ${locationMatch}`);
+
+                const registryMatch = order.coefficients.Registry.hasOwnProperty(tokenRegistry);
+                log(`Comparing token registry ${tokenRegistry} with order registry coefficients. Match result: ${registryMatch}`);
+
+                const sectorMatch = order.coefficients.Sector.hasOwnProperty(tokenSector);
+                log(`Comparing token sector ${tokenSector} with order sector coefficients. Match result: ${sectorMatch}`);
+
+                log(`Overall match result: ${locationMatch && registryMatch && sectorMatch}`);
+
+                return locationMatch && registryMatch && sectorMatch;
+            }
+
+
+            function isLocationMatch(orderLocationCoefficients, tokenCountry) {
+                if (!tokenCountry) {
+                    log(`Token country is undefined, location match failed.`);
+                    return false;
+                }
+                
+                const tokenRegion = getRegionForCountry(tokenCountry);
+                const locationMatch = orderLocationCoefficients.hasOwnProperty(tokenRegion);
+
+                log(`Comparing token country ${tokenCountry} (region: ${tokenRegion}) with order location coefficients. Match result: ${locationMatch}`);
+                return locationMatch;
+            }
+
+            function getRegionForCountry(country) {
+                for (const [region, countries] of Object.entries(regionCountries)) {
+                    if (countries.includes(country)) {
+                        return region;
+                    }
+                }
+                return "Not Specified";
+            }
+
+            function calculateOrderPrice(order, token) {
+                let price = order.maxPrice;
+                const coefficients = order.coefficients;
+
+                const location = token.unitData?.issuanceData?.projectData?.locations[0]?.country;
+                if (location && isLocationMatch(order.coefficients.Location, location)) {
+                    const locationCoefficient = coefficients.Location[getRegionForCountry(location)];
+                    price += locationCoefficient;
+                }
+
+                const registry = token.unitData?.issuanceData?.projectData?.currentRegistry;
+                if (registry && coefficients.Registry.hasOwnProperty(registry)) {
+                    const registryCoefficient = coefficients.Registry[registry];
+                    price += registryCoefficient;
+                }
+
+                const sector = token.unitData?.issuanceData?.projectData?.sector;
+                if (sector && coefficients.Sector[sector]) {
+                    const sectorCoefficient = coefficients.Sector[sector];
+                    price += sectorCoefficient;
+                }
+
+                return price;
+            }
+
+            function copyToClipboard(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                log(`Copied to clipboard: ${text}`);
+            }
+
+            function createPricingEquation(order) {
+                if (order.orderType === 'Information Agnostic') {
+                    return `Price = ${order.maxPrice.toFixed(2)}`;
+                }
+
+                let pricingEquation = `Price = ${order.maxPrice.toFixed(2)}`;
+
+                const registryCoefficients = Object.entries(order.coefficients.Registry)
+                    .map(([registry, value]) => `${registry}: ${value.toFixed(2)}`)
+                    .join('\n');
+                pricingEquation += `\nRegistry:\n${registryCoefficients}`;
+
+                const sectorCoefficients = Object.entries(order.coefficients.Sector)
+                    .map(([sector, value]) => `${sector}: ${value.toFixed(2)}`)
+                    .join('\n');
+                pricingEquation += `\nSector:\n${sectorCoefficients}`;
+
+                const locationCoefficients = Object.entries(order.coefficients.Location)
+                    .map(([location, value]) => `${location}: ${value.toFixed(2)}`)
+                    .join('\n');
+                pricingEquation += `\nLocation:\n${locationCoefficients}`;
+
+                return pricingEquation;
+            }
+
+            function truncateStringWithEllipsis(str, maxLength) {
+                if (str.length > maxLength) {
+                    return str.substring(0, maxLength) + '...';
+                }
+                return str;
+            }
+
+            function createShortPricingEquation(order, token = null, price = null) {
+                log("createShortPricingEquation called with:");
+                log("Order: " + JSON.stringify(order, null, 2));
+                log("Token: " + (token ? JSON.stringify(token, null, 2) : "No token provided"));
+                log("Price: " + (price !== null ? price.toFixed(2) : "No price provided"));
+
+                if (order.orderType === 'Information Agnostic') {
+                    log("Order is of type 'Information Agnostic'. Returning fixed price.");
+                    return `Price = ${order.maxPrice.toFixed(2)}`;
+                }
+
+                let pricingEquation = `Price = ${order.maxPrice.toFixed(2)}`;
+                log("Initial pricingEquation: " + pricingEquation);
+
+                const relevantCoefficients = [];
+                const maxLength = 20; 
+
+                if (token) {
+                    log("Processing token-related coefficients");
+
+                    const tokenRegistry = token.unitData?.issuanceData?.projectData?.currentRegistry;
+                    if (tokenRegistry && order.coefficients.Registry.hasOwnProperty(tokenRegistry)) {
+                        const registryCoefficient = order.coefficients.Registry[tokenRegistry];
+                        log("Registry coefficient found: " + registryCoefficient);
+                        relevantCoefficients.push(`<span class="green-text">Registry: ${truncateStringWithEllipsis(tokenRegistry, maxLength)}: ${registryCoefficient.toFixed(2)}</span>`);
+                    }
+
+                    const tokenSector = token.unitData?.issuanceData?.projectData?.sector;
+                    if (tokenSector && order.coefficients.Sector.hasOwnProperty(tokenSector)) {
+                        const sectorCoefficient = order.coefficients.Sector[tokenSector];
+                        log("Sector coefficient found: " + sectorCoefficient);
+                        relevantCoefficients.push(`<span class="green-text">Sector: ${truncateStringWithEllipsis(tokenSector, maxLength)}: ${sectorCoefficient.toFixed(2)}</span>`);
+                    }
+
+                    const tokenLocation = getRegionForCountry(token.unitData?.issuanceData?.projectData?.locations[0]?.country);
+                    if (tokenLocation && order.coefficients.Location.hasOwnProperty(tokenLocation)) {
+                        const locationCoefficient = order.coefficients.Location[tokenLocation];
+                        log("Location coefficient found: " + locationCoefficient);
+                        relevantCoefficients.push(`<span class="green-text">Location: ${truncateStringWithEllipsis(tokenLocation, maxLength)}: ${locationCoefficient.toFixed(2)}</span>`);
+                    }
+                } else {
+                    log("No token provided, processing first available coefficients.");
+
+                    const firstRegistry = Object.entries(order.coefficients.Registry)[0];
+                    if (firstRegistry) {
+                        relevantCoefficients.push(`<span class="green-text">Registry: ${truncateStringWithEllipsis(firstRegistry[0], maxLength)}: ${firstRegistry[1].toFixed(2)}</span>`);
+                    }
+
+                    const firstSector = Object.entries(order.coefficients.Sector)[0];
+                    if (firstSector) {
+                        relevantCoefficients.push(`<span class="green-text">Sector: ${truncateStringWithEllipsis(firstSector[0], maxLength)}: ${firstSector[1].toFixed(2)}</span>`);
+                    }
+
+                    const firstLocation = Object.entries(order.coefficients.Location)[0];
+                    if (firstLocation) {
+                        relevantCoefficients.push(`<span class="green-text">Location: ${truncateStringWithEllipsis(firstLocation[0], maxLength)}: ${firstLocation[1].toFixed(2)}</span>`);
+                    }
+                }
+
+                const pricePart = price !== null ? ` = <span class="orange-text">${price.toFixed(2)}</span>` : '';
+
+                pricingEquation += (relevantCoefficients.length > 0 ? " + " + relevantCoefficients.join(' + ') : '') + pricePart;
+
+                log("Final pricing equation before returning: " + pricingEquation);
+
+                return pricingEquation;
+            }
+
+        });
+    </script>
+</body>
+
+</html>

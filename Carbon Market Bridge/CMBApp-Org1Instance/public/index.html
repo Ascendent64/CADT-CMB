@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: darkgreen;
+        color: white;
+        padding: 10px;
+    }
+
+    .nav-bar {
+        display: flex;
+        justify-content: center;
+        background-color: darkgreen;
+        padding: 10px;
+    }
+
+    .nav-bar a {
+        color: white;
+        padding: 14px 20px;
+        text-decoration: none;
+        text-align: center;
+    }
+
+    .nav-bar a:hover {
+        background-color: #ddd;
+        color: black;
+    }
+
+    .client-id-box {
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+        color: black;
+        display: flex;
+        align-items: center;
+    }
+
+    .log {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-top: 10px;
+        height: 100px;
+        overflow-y: scroll;
+        color: black !important;
+        z-index: 5;
+        position: relative;
+    }
+
+    .dropdown-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: #f9f9f9;
+        min-width: 160px;
+        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+        z-index: 6;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .dropdown-content.show {
+        display: block;
+    }
+
+    .icon {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        vertical-align: middle;
+        margin-left: 5px;
+    }
+
+    .copy-icon {
+        cursor: pointer;
+        margin-left: 5px;
+        vertical-align: middle;
+        width: 14px;
+        height: 14px;
+    }
+
+    .table-container {
+        display: flex;
+        width: 100%;
+        overflow-x: auto;
+        flex-grow: 1;
+    }
+
+    .fixed-table {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 2;
+    }
+
+    table {
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        width: 100%;
+    }
+
+    th,
+    td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    th {
+        background-color: #f2f2f2;
+        position: sticky;
+        top: 0;
+        z-index: 3;
+    }
+
+    .main-header {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+    }
+
+    .second-header {
+        position: sticky;
+        top: 40px;
+        z-index: 3;
+    }
+
+    .filter-row {
+        position: sticky;
+        top: 80px;
+        z-index: 3;
+        background-color: #fff;
+    }
+
+    .green-bg {
+        background-color: #e0f7e0;
+    }
+
+    .blue-bg {
+        background-color: #cce5ff;
+    }
+
+    .red-bg {
+        background-color: #f8d7da;
+    }
+
+    .scrollable-table-container {
+        flex-grow: 1;
+        overflow: hidden;
+        display: flex;
+    }
+
+    .sidepanel {
+        height: 100%;
+        width: 0;
+        position: fixed;
+        z-index: 4;
+        top: 0;
+        right: 0;
+        background-color: white;
+        overflow-x: hidden;
+        transition: 0.5s;
+        padding-top: 60px;
+        box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidepanel .closebtn {
+        position: absolute;
+        top: 10px;
+        right: 25px;
+        font-size: 36px;
+    }
+
+    .sidepanel-content {
+        padding: 20px;
+    }
+
+    .sidepanel-content>div {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+    }
+
+    .token-details {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .token-details table {
+        width: 100%;
+        table-layout: auto;
+    }
+
+    .token-details th,
+    .token-details td {
+        padding: 4px 8px;
+    }
+
+    .token-details th {
+        background-color: #f2f2f2;
+        text-align: left;
+    }
+
+    .green-bg th {
+        background-color: #e0f7e0;
+    }
+
+    .red-border {
+        border: 2px solid rgb(255, 153, 0);
+    }
+
+    .hover-grey {
+        background-color: rgba(128, 128, 128, 0.5);
+    }
+
+    .filter-box {
+        position: absolute;
+        z-index: 10;
+        background-color: white;
+        border: 1px solid #ccc;
+        padding: 10px;
+        display: none;
+    }
+
+    .filter-button {
+        margin-top: 5px;
+        cursor: pointer;
+    }
+
+    .filters {
+        background-color: #f2f2f2;
+        padding: 10px;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
+
+    .filter-item {
+        display: inline-block;
+        margin-right: 10px;
+    }
+
+    .sort-container {
+        margin-bottom: 10px;
+    }
+
+    .audit-popup {
+        display: none;
+        position: fixed;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -20%);
+        width: 40%;
+        background-color: white;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        z-index: 100;
+    }
+
+    .audit-popup .closebtn {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    .sort-button,
+    .audit-button {
+        padding: 5px 10px;
+        background-color: darkgreen;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .success-popup {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #4CAF50;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        z-index: 1000;
+        display: none;
+    }
+
+
+    #popup {
+            position: fixed;
+            top: 200px; 
+            right: 20px;
+            padding: 10px;
+            background-color: transparent;
+            border-radius: 5px;
+            display: none;
+            z-index: 9999;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            max-width: 500px;
+            word-wrap: break-word; 
+        }
+        .message-box {
+            background-color: darkgreen;
+            color: white;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid white; 
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+</style>
+
+<body>
+    <div class="nav-bar">
+        <a href="index.html">Database</a>
+        <a href="OrderBookOrder.html">Order Book - Order</a>
+        <a href="OrderBookList.html">Order Book- List</a>
+    </div>
+    <div class="header">
+        <h1>Carbon Market Bridge - Database</h1>
+        <div>
+            <button id="logButton">Logs</button>
+            <button id="flushRedisButton">Flush Redis</button>
+            <div class="dropdown-container">
+                <div id="logDropdown" class="dropdown-content">
+                    <div id="log"></div>
+                </div>
+            </div>
+            <label for="command">Command:</label>
+            <select id="command">
+                <option value="claimUnitByID">Claim Unit By ID</option>
+                <option value="burnToken">Burn Token</option>
+                <option value="listToken">List Token</option>
+                <option value="delistToken">Delist Token</option>
+                <option value="transferToken">Transfer Token</option>
+                <option value="splitUnits">Split Units</option>
+                <option value="buyToken">Buy Token</option>
+            </select>
+            <input type="text" id="args" placeholder="Arguments (comma separated)">
+            <button id="executeCommandButton">Execute</button>
+        </div>
+        <div id="clientIDBox" class="client-id-box">Client ID: Fetching...</div>
+    </div>
+    <div class="filters" id="filters"></div>
+    <div class="sort-container">
+        <label for="sortPrimary">Sort by:</label>
+        <select id="sortPrimary">
+            <option value="unitCount">Unit Count</option>
+            <option value="price">Price</option>
+        </select>
+        <select id="sortPrimaryOrder">
+            <option value="asc">Low to High</option>
+            <option value="desc">High to Low</option>
+        </select>
+        <label for="sortSecondary">Then by:</label>
+        <select id="sortSecondary">
+            <option value="unitCount">Unit Count</option>
+            <option value="price">Price</option>
+        </select>
+        <select id="sortSecondaryOrder">
+            <option value="asc">Low to High</option>
+            <option value="desc">High to Low</option>
+        </select>
+        <button id="sortButton" class="sort-button">Sort</button>
+        <button id="auditButton" class="audit-button">Audit</button>
+    </div>
+
+    <button id="listTokensButton">List Tokens</button>
+    <div class="scrollable-table-container">
+        <div class="table-container" id="fixedTableContainer">
+            <table class="fixed-table">
+                <thead>
+                    <tr class="main-header">
+                        <th colspan="1" style="border: 2px solid black;">Shared Identities</th>
+                        <th colspan="7">Trading Platform</th>
+                        <th colspan="4" class="green-bg">CADT Preview</th>
+                    </tr>
+                    <tr class="second-header">
+                        <th>Warehouse Unit ID</th>
+                        <th>Trading Platform ID</th>
+                        <th>Unit Count</th>
+                        <th>State</th>
+                        <th>Burned By</th>
+                        <th>Burned At</th>
+                        <th>Price</th>
+                        <th>Owner</th>
+                        <th>Current Registry</th>
+                        <th>Vintage Year</th>
+                        <th>Location</th>
+                        <th>Sector</th>
+                    </tr>
+                    <tr class="filter-row">
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                    </tr>
+                </thead>
+                <tbody id="fixedTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div class="table-container" id="scrollableTableContainer">
+            <table>
+                <thead>
+                    <tr class="main-header">
+                        <th colspan="18" class="green-bg">Climate Action Data Trust - Unit</th>
+                        <th colspan="9" class="green-bg">Climate Action Data Trust - Issuance</th>
+                        <th colspan="17" class="green-bg">Climate Action Data Trust - Project</th>
+                    </tr>
+                    <tr class="second-header">
+                        <th>Org UID</th>
+                        <th>Issuance ID</th>
+                        <th>Vintage Year</th>
+                        <th>Unit Type</th>
+                        <th>Project Location ID</th>
+                        <th>Serial Number Block</th>
+                        <th>Serial Number Pattern</th>
+                        <th>Marketplace Link</th>
+                        <th>Marketplace Identifier</th>
+                        <th>Unit Tags</th>
+                        <th>Unit Status</th>
+                        <th>Unit Status Reason</th>
+                        <th>Unit Registry Link</th>
+                        <th>Corresponding Adjustment Declaration</th>
+                        <th>Corresponding Adjustment Status</th>
+                        <th>Time Staged</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <!-- issuance -->
+                        <th>Org UID</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Verification Approach</th>
+                        <th>Verification Report Date</th>
+                        <th>Verification Body</th>
+                        <th>Time Staged</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        <!-- project -->
+                        <th>Project Name</th>
+                        <th>Project Link</th>
+                        <th>Project Developer</th>
+                        <th>Sector</th>
+                        <th>Project Type</th>
+                        <th>Project Tags</th>
+                        <th>Covered By NDC</th>
+                        <th>NDC Information</th>
+                        <th>Project Status</th>
+                        <th>Project Status Date</th>
+                        <th>Unit Metric</th>
+                        <th>Methodology</th>
+                        <th>Validation Body</th>
+                        <th>Validation Date</th>
+                        <th>Time Staged</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                    </tr>
+                    <tr class="filter-row">
+                        <!-- unit -->
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <!-- issuance -->
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <!-- project  -->
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                        <th><button class="filter-button">Filter</button></th>
+                    </tr>
+                </thead>
+                <tbody id="tokensTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="log" id="log"></div>
+    <div id="sidepanel" class="sidepanel">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeSidepanel()">&times;</a>
+        <div class="sidepanel-content" id="sidepanelContent"></div>
+    </div>
+    <div class="audit-popup" id="auditPopup">
+        <span class="closebtn" id="closeAuditPopup">&times;</span>
+        <h2>Unit Count Timeseries</h2>
+        <label for="dateBasis">Date Basis:</label>
+        <select id="dateBasis">
+            <option value="claimedAt">Claimed At</option>
+            <option value="burnedAt">Burned At</option>
+        </select>
+        <label for="segmentBy">Segment by:</label>
+        <select id="segmentBy">
+            <option value="none">None</option>
+            <option value="warehouseUnitID">TradingPlatform-Warehouse Unit ID</option>
+            <option value="tradingPlatformID">TradingPlatform-Trading Platform ID</option>
+            <option value="unitCount">TradingPlatform-Unit Count</option>
+            <option value="state">TradingPlatform-State</option>
+            <option value="burnedByOrgName">TradingPlatform-Burned By</option>
+            <option value="burnedAt">TradingPlatform-Burned At</option>
+            <option value="price">TradingPlatform-Price</option>
+            <option value="owner">TradingPlatform-Owner</option>
+            <option value="currentRegistry">TradingPlatform-Current Registry</option>
+            <!-- unit -->
+            <option value="unitData.orgUid">CADT-Unit Org UID</option>
+            <option value="unitData.issuanceId">CADT-Unit Issuance ID</option>
+            <option value="unitData.vintageYear">CADT-Unit Vintage Year</option>
+            <option value="unitData.unitType">CADT-Unit Type</option>
+            <option value="unitData.projectLocationId">CADT-Unit Project Location ID</option>
+            <option value="unitData.serialNumberBlock">CADT-Unit Serial Number Block</option>
+            <option value="unitData.serialNumberPattern">CADT-Unit Serial Number Pattern</option>
+            <option value="unitData.marketplaceLink">CADT-Unit Marketplace Link</option>
+            <option value="unitData.marketplaceIdentifier">CADT-Unit Marketplace Identifier</option>
+            <option value="unitData.unitTags">CADT-Unit Tags</option>
+            <option value="unitData.unitStatus">CADT-Unit Status</option>
+            <option value="unitData.unitStatusReason">CADT-Unit Status Reason</option>
+            <option value="unitData.unitRegistryLink">CADT-Unit Registry Link</option>
+            <option value="unitData.correspondingAdjustmentDeclaration">CADT-Unit Corresponding Adjustment Declaration</option>
+            <option value="unitData.correspondingAdjustmentStatus">CADT-Unit Corresponding Adjustment Status</option>
+            <option value="unitData.timeStaged">CADT-Unit Time Staged</option>
+            <option value="unitData.createdAt">CADT-Unit Created At</option>
+            <option value="unitData.updatedAt">CADT-Unit Updated At</option>
+            <!-- issuance -->
+            <option value="unitData.issuanceData.orgUid">CADT-Issuance Org UID</option>
+            <option value="unitData.issuanceData.startDate">CADT-Issuance Start Date</option>
+            <option value="unitData.issuanceData.endDate">CADT-Issuance End Date</option>
+            <option value="unitData.issuanceData.verificationApproach">CADT-Issuance Verification Approach</option>
+            <option value="unitData.issuanceData.verificationReportDate">CADT-Issuance Verification Report Date</option>
+            <option value="unitData.issuanceData.verificationBody">CADT-Issuance Verification Body</option>
+            <option value="unitData.issuanceData.timeStaged">CADT-Issuance Time Staged</option>
+            <option value="unitData.issuanceData.createdAt">CADT-Issuance Created At</option>
+            <option value="unitData.issuanceData.updatedAt">CADT-Issuance Updated At</option>
+            <!-- project -->
+            <option value="unitData.issuanceData.projectData.projectName">CADT-Project Name</option>
+            <option value="unitData.issuanceData.projectData.projectLink">CADT-Project Link</option>
+            <option value="unitData.issuanceData.projectData.projectDeveloper">CADT-Project Developer</option>
+            <option value="unitData.issuanceData.projectData.sector">CADT-Project Sector</option>
+            <option value="unitData.issuanceData.projectData.projectType">CADT-Project Type</option>
+            <option value="unitData.issuanceData.projectData.projectTags">CADT-Project Tags</option>
+            <option value="unitData.issuanceData.projectData.coveredByNDC">CADT-Project Covered By NDC</option>
+            <option value="unitData.issuanceData.projectData.ndcInformation">CADT-Project NDC Information</option>
+            <option value="unitData.issuanceData.projectData.projectStatus">CADT-Project Status</option>
+            <option value="unitData.issuanceData.projectData.projectStatusDate">CADT-Project Status Date</option>
+            <option value="unitData.issuanceData.projectData.unitMetric">CADT-Project Unit Metric</option>
+            <option value="unitData.issuanceData.projectData.methodology">CADT-Project Methodology</option>
+            <option value="unitData.issuanceData.projectData.validationBody">CADT-Project Validation Body</option>
+            <option value="unitData.issuanceData.projectData.validationDate">CADT-Project Validation Date</option>
+            <option value="unitData.issuanceData.projectData.timeStaged">CADT-Project Time Staged</option>
+            <option value="unitData.issuanceData.projectData.createdAt">CADT-Project Created At</option>
+            <option value="unitData.issuanceData.projectData.updatedAt">CADT-Project Updated At</option>
+        </select>
+        <canvas id="auditChart"></canvas>
+        <div id="totalUnitCount"></div>
+        <div id="totalRetiredUnitCount"></div>
+    </div>
+    <div id="popup"></div>
+    <script>
+        const ws = new WebSocket('ws://localhost:3000');
+            ws.onmessage = function (event) {
+                const maxLength = 100; 
+                const message = event.data.length > maxLength ? event.data.slice(0, maxLength) + '...' : event.data;
+
+                const popup = document.getElementById('popup');
+                const newMessageBox = document.createElement('div');
+                newMessageBox.classList.add('message-box');
+
+                newMessageBox.innerText = message;
+
+                popup.appendChild(newMessageBox); 
+                popup.style.display = 'block';
+
+                setTimeout(() => {
+                    if (newMessageBox) {
+                        popup.removeChild(newMessageBox);
+                    }
+                    if (!popup.hasChildNodes()) {
+                        popup.style.display = 'none'; 
+                    }
+                }, 3000);
+            };
+
+            ws.onopen = function () {
+                console.log('WebSocket connection established.');
+            };
+
+            ws.onclose = function () {
+                console.log('WebSocket connection closed.');
+            };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const logButton = document.getElementById('logButton');
+            const logDropdown = document.getElementById('logDropdown');
+            logButton.addEventListener('click', () => {
+                logDropdown.classList.toggle('show');
+            });
+
+            const auditButton = document.getElementById('auditButton');
+            const auditPopup = document.getElementById('auditPopup');
+            const closeAuditPopup = document.getElementById('closeAuditPopup');
+            const successPopup = document.createElement('div');
+            successPopup.className = 'success-popup';
+            document.body.appendChild(successPopup);
+
+            const listTokensButton = document.getElementById('listTokensButton');
+            const executeCommandButton = document.getElementById('executeCommandButton');
+            const logDiv = document.getElementById('log');
+            const fixedTableBody = document.getElementById('fixedTableBody');
+            const tokensTableBody = document.getElementById('tokensTableBody');
+            const clientIDBox = document.getElementById('clientIDBox');
+            const fixedTableContainer = document.getElementById('fixedTableContainer');
+            const scrollableTableContainer = document.getElementById('scrollableTableContainer');
+            const sidepanel = document.getElementById('sidepanel');
+            const filtersDiv = document.getElementById('filters');
+            const sortButton = document.getElementById('sortButton');
+            const dateBasisDropdown = document.getElementById('dateBasis');
+            let tokensData = [];
+            let clientID = '';
+            let sidepanelOpen = false;
+            let filters = {};
+
+            function syncScroll(source, target) {
+                target.scrollTop = source.scrollTop;
+            }
+
+            fixedTableContainer.addEventListener('scroll', () => syncScroll(fixedTableContainer, scrollableTableContainer));
+            scrollableTableContainer.addEventListener('scroll', () => syncScroll(scrollableTableContainer, fixedTableContainer));
+
+            fetch('/api/getClientIdentity', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([])
+                })
+                .then(response => response.text())
+                .then(id => {
+                    clientID = id;
+                    if (clientID.length > 10) {
+                        clientIDBox.innerHTML = `Client ID: ${clientID.substring(0, 10)}... <img src="assets/Copy.png" class="icon" data-text="${clientID}">`;
+                    } else {
+                        clientIDBox.innerHTML = `Client ID: ${clientID} <img src="assets/Copy.png" class="icon" data-text="${clientID}">`;
+                    }
+                    document.querySelector('.icon').addEventListener('click', event => {
+                        copyToClipboard(event.target.dataset.text);
+                    });
+                })
+                .catch(error => {
+                    clientIDBox.textContent = 'Client ID: Failed';
+                    log(`Error retrieving Client ID`);
+                });
+
+            const closeBtn = document.querySelector('.closebtn');
+            closeBtn.addEventListener('click', closeSidepanel);
+
+
+            listTokensButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/listAllTokens', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([])
+                });
+                if (!response.ok) {
+                    throw new Error(`Error listing tokens: ${response.statusText}`);
+                }
+                tokensData = await response.json();
+                console.log('Retrieved tokens:', tokensData); 
+                log(`Tokens listed successfully.`);
+                updateTokensTable(sortAndFilterTokens());
+            } catch (error) {
+                log(`Error listing tokens: ${error.message}`);
+            }
+        });
+
+            document.addEventListener('DOMContentLoaded', () => {
+            
+            const flushRedisButton = document.getElementById('flushRedisButton');
+
+            flushRedisButton.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/flushRedis', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Error flushing Redis: ${response.statusText}`);
+                    }
+                    const result = await response.text();
+                    log(`Redis cache flushed successfully.`);
+                    showSuccessPopup('Redis cache flushed successfully.');
+                } catch (error) {
+                    log(`Error flushing Redis: ${error.message}`);
+                }
+            });
+
+            function log(message) {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            p.innerText = message;
+            p.style.color = 'black';
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+            function showSuccessPopup(message) {
+                successPopup.innerText = message;
+                successPopup.style.display = 'block';
+                setTimeout(() => {
+                    successPopup.style.display = 'none';
+                }, 3000);
+            }
+        });
+
+            executeCommandButton.addEventListener('click', async() => {
+                const command = document.getElementById('command').value;
+                const args = document.getElementById('args').value.split(',');
+
+                try {
+                    const response = await fetch(`/api/${command}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(args)
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Error executing ${command}: ${response.statusText}`);
+                    }
+                    const result = await response.json();
+                    log(`Executed ${command} successfully`);
+                    showSuccessPopup(`Executed ${command} successfully`);
+                } catch (error) {
+                    log(`Error executing ${command}: ${error.message}`);
+                }
+            });
+
+            function showSuccessPopup(message) {
+            const successPopup = document.createElement('div');
+            successPopup.className = 'success-popup';
+            successPopup.innerText = message;
+            document.body.appendChild(successPopup);
+            successPopup.style.display = 'block';
+            setTimeout(() => {
+                successPopup.style.display = 'none';
+                document.body.removeChild(successPopup);
+            }, 3000);
+        }
+
+            function updateTokensTable(tokens) {
+                fixedTableBody.innerHTML = '';
+                tokensTableBody.innerHTML = '';
+                tokens.forEach((token, index) => {
+                    const fixedRow = fixedTableBody.insertRow();
+                    const row = tokensTableBody.insertRow();
+
+                    const warehouseUnitIDCell = fixedRow.insertCell();
+                    warehouseUnitIDCell.innerHTML = `${truncateString(token.warehouseUnitID)}${token.warehouseUnitID ? ' <img src="assets/Copy.png" class="icon" data-text="' + token.warehouseUnitID + '">' : ''}`;
+
+                    const tradingPlatformIDCell = fixedRow.insertCell();
+                    tradingPlatformIDCell.innerHTML = `${truncateString(token.tradingPlatformID)}${token.tradingPlatformID ? ' <img src="assets/Copy.png" class="icon" data-text="' + token.tradingPlatformID + '">' : ''}`;
+
+                    const unitCountCell = fixedRow.insertCell();
+                    unitCountCell.innerHTML = `${token.unitCount}${token.unitCount ? ' <img src="assets/Copy.png" class="icon" data-text="' + token.unitCount + '">' : ''}`;
+
+                    const stateCell = fixedRow.insertCell();
+                    if (token.burned) {
+                        const fireIcon = document.createElement('img');
+                        fireIcon.src = 'assets/Recycled.png';
+                        fireIcon.alt = 'Recycled';
+                        fireIcon.className = 'icon';
+                        stateCell.appendChild(fireIcon);
+                        const burnedDetails = document.createElement('span');
+                        burnedDetails.innerHTML = 'Burned';
+                        stateCell.appendChild(burnedDetails);
+                        fixedRow.classList.add('red-bg');
+                    } else if (token.listed) {
+                        const auctionIcon = document.createElement('img');
+                        auctionIcon.src = 'assets/Market.png';
+                        auctionIcon.alt = 'Listed';
+                        auctionIcon.className = 'icon';
+                        stateCell.appendChild(auctionIcon);
+                        const listedDetails = document.createElement('span');
+                        listedDetails.innerHTML = 'Listed';
+                        stateCell.appendChild(listedDetails);
+                        fixedRow.classList.add('blue-bg');
+                    } else {
+                        stateCell.innerHTML = 'NA';
+                    }
+
+                    const burnedByCell = fixedRow.insertCell();
+                    burnedByCell.innerHTML = `${token.burnedByOrgName || 'N/A'}`;
+
+                    const burnedAtCell = fixedRow.insertCell();
+                    burnedAtCell.innerHTML = `${token.burned ? new Date(token.burnedAt * 1000).toLocaleDateString('en-GB') : 'N/A'}`;
+
+                    const priceCell = fixedRow.insertCell();
+                    const price = token.listed ? `${token.listedUnitPrice} ${token.tokenName}` : 'NA';
+                    priceCell.innerHTML = `${price}${price !== 'NA' ? ' <img src="assets/Copy.png" class="icon" data-text="' + price + '">' : ''}`;
+
+                    const ownerCell = fixedRow.insertCell();
+                    ownerCell.innerHTML = `${truncateString(token.owner)}${token.owner ? ' <img src="assets/Copy.png" class="icon" data-text="' + token.owner + '">' : ''}`;
+
+                    const currentRegistryCell = fixedRow.insertCell();
+                    const currentRegistry = token.unitData?.issuanceData?.projectData?.currentRegistry || 'N/A';
+                    currentRegistryCell.innerHTML = `${truncateString(currentRegistry)}${currentRegistry ? ' <img src="assets/Copy.png" class="icon" data-text="' + currentRegistry + '">' : ''}`;
+                    currentRegistryCell.className = 'green-bg';
+
+                    const vintageYearCell = fixedRow.insertCell();
+                    const vintageYear = token.unitData?.vintageYear || 'N/A';
+                    vintageYearCell.innerHTML = `${truncateString(vintageYear.toString())}${vintageYear ? ' <img src="assets/Copy.png" class="icon" data-text="' + vintageYear + '">' : ''}`;
+                    vintageYearCell.className = 'green-bg';
+
+                    const locationCell = fixedRow.insertCell();
+                    const location = token.unitData?.issuanceData?.projectData?.locations[0]?.country || 'N/A';
+                    locationCell.innerHTML = `${truncateString(location)}${location !== 'N/A' ? ' <img src="assets/Copy.png" class="icon" data-text="' + location + '">' : ''}`;
+                    locationCell.className = 'green-bg';
+
+                    const sectorCell = fixedRow.insertCell();
+                    const sector = token.unitData?.issuanceData?.projectData?.sector || 'N/A';
+                    sectorCell.innerHTML = `${truncateString(sector)}${sector ? ' <img src="assets/Copy.png" class="icon" data-text="' + sector + '">' : ''}`;
+                    sectorCell.className = 'green-bg';
+
+                    const unitData = token.unitData || {};
+                    const issuanceData = unitData.issuanceData || {};
+                    const projectData = issuanceData.projectData || {};
+
+                    const unitColumns = [
+                        'orgUid', 'issuanceId', 'vintageYear', 'unitType', 'projectLocationId',
+                        'serialNumberBlock', 'serialNumberPattern', 'marketplaceLink',
+                        'marketplaceIdentifier', 'unitTags', 'unitStatus', 'unitStatusReason',
+                        'unitRegistryLink', 'correspondingAdjustmentDeclaration', 'correspondingAdjustmentStatus',
+                        'timeStaged', 'createdAt', 'updatedAt'
+                    ];
+
+                    const issuanceColumns = [
+                        'orgUid', 'startDate', 'endDate', 'verificationApproach', 'verificationReportDate',
+                        'verificationBody', 'timeStaged', 'createdAt', 'updatedAt'
+                    ];
+
+                    const projectColumns = [
+                        'projectName', 'projectLink', 'projectDeveloper', 'sector', 'projectType',
+                        'projectTags', 'coveredByNDC', 'ndcInformation', 'projectStatus', 'projectStatusDate',
+                        'unitMetric', 'methodology', 'validationBody', 'validationDate',
+                        'timeStaged', 'createdAt', 'updatedAt'
+                    ];
+
+                    unitColumns.forEach(col => {
+                        const cell = row.insertCell();
+                        const value = getValueByKeyPath(unitData, col) || '';
+                        cell.innerHTML = `${truncateString(value.toString())}${value ? ' <img src="assets/Copy.png" class="icon" data-text="' + value + '">' : ''}`;
+                        cell.className = 'green-bg';
+                    });
+
+                    issuanceColumns.forEach(col => {
+                        const cell = row.insertCell();
+                        const value = getValueByKeyPath(issuanceData, col) || '';
+                        cell.innerHTML = `${truncateString(value.toString())}${value ? ' <img src="assets/Copy.png" class="icon" data-text="' + value + '">' : ''}`;
+                        cell.className = 'green-bg';
+                    });
+
+                    projectColumns.forEach(col => {
+                        const cell = row.insertCell();
+                        const value = getValueByKeyPath(projectData, col) || '';
+                        cell.innerHTML = `${truncateString(value.toString())}${value ? ' <img src="assets/Copy.png" class="icon" data-text="' + value + '">' : ''}`;
+                        cell.className = 'green-bg';
+                    });
+
+                    if (token.owner === clientID) {
+                        fixedRow.classList.add('red-border');
+                        row.classList.add('red-border');
+                    }
+
+                    fixedRow.addEventListener('mouseover', () => {
+                        if (!sidepanelOpen) fixedRow.classList.add('hover-grey');
+                    });
+
+                    fixedRow.addEventListener('mouseout', () => {
+                        if (!sidepanelOpen) fixedRow.classList.remove('hover-grey');
+                    });
+
+                    row.addEventListener('mouseover', () => {
+                        if (!sidepanelOpen) fixedRow.classList.add('hover-grey');
+                    });
+
+                    row.addEventListener('mouseout', () => {
+                        if (!sidepanelOpen) fixedRow.classList.remove('hover-grey');
+                    });
+
+                    fixedRow.addEventListener('click', () => openSidepanel(token));
+                    row.addEventListener('click', () => openSidepanel(token));
+                });
+
+                document.querySelectorAll('.icon').forEach(icon => {
+                    icon.addEventListener('click', event => {
+                        event.stopPropagation();
+                        copyToClipboard(event.target.dataset.text);
+                    });
+                });
+
+                updateAuditData(tokens);
+            }
+
+            function getValueByKeyPath(obj, keyPath) {
+                const keys = keyPath.split('.');
+                let value = obj;
+                for (let key of keys) {
+                    value = value ? value[key] : undefined;
+                }
+                return value;
+            }
+
+            function truncateString(str) {
+                return str && str.length > 10 ? str.substring(0, 10) + '...' : str || '';
+            }
+
+            function openSidepanel(token) {
+                sidepanelOpen = true;
+                const sidepanel = document.getElementById("sidepanel");
+                const sidepanelContent = document.getElementById("sidepanelContent");
+
+                const tradingPlatformTable = `
+                    <h3>Trading Platform</h3>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <th>Warehouse Unit ID</th>
+                                <td>${token.warehouseUnitID.length > 10 ? token.warehouseUnitID.substring(0, 10) + '...' : token.warehouseUnitID}${token.warehouseUnitID ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + token.warehouseUnitID + '\')" />' : ''}</td>
+                            </tr>
+                            <tr>
+                                <th>Trading Platform ID</th>
+                                <td>${token.tradingPlatformID.length > 10 ? token.tradingPlatformID.substring(0, 10) + '...' : token.tradingPlatformID}${token.tradingPlatformID ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + token.tradingPlatformID + '\')" />' : ''}</td>
+                            </tr>
+                            <tr>
+                                <th>Unit Count</th>
+                                <td>${token.unitCount}${token.unitCount ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + token.unitCount + '\')" />' : ''}</td>
+                            </tr>
+                            <tr>
+                                <th>Owner</th>
+                                <td>${token.owner.length > 10 ? token.owner.substring(0, 10) + '...' : token.owner}${token.owner ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + token.owner + '\')" />' : ''}</td>
+                            </tr>
+                            <tr>
+                                <th>Unit Hash</th>
+                                <td>${token.unitHash.length > 10 ? token.unitHash.substring(0, 10) + '...' : token.unitHash}${token.unitHash ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + token.unitHash + '\')" />' : ''}</td>
+                            </tr>
+                            <tr>
+                                <th>Claimed At</th>
+                                <td>${new Date(token.claimedAt * 1000).toLocaleString()}${token.claimedAt ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + new Date(token.claimedAt * 1000).toLocaleString() + '\')" />' : ''}</td>
+                            </tr>
+                            ${token.burned ? `<tr><th>Burned At</th><td>${new Date(token.burnedAt * 1000).toLocaleString()}</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                `;
+
+                const cadtTable = `
+                    <h3>CADT - Unit</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${Object.entries(token.unitData || {}).map(([key, value]) => {
+                                if (typeof value === 'object') return '';
+                                return `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const issuanceTable = `
+                    <h3>CADT - Issuance</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${Object.entries(token.unitData.issuanceData || {}).map(([key, value]) => {
+                                if (typeof value === 'object') return '';
+                                return `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const projectTable = `
+                    <h3>CADT - Project</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${Object.entries(token.unitData.issuanceData.projectData || {}).map(([key, value]) => {
+                                if (typeof value === 'object') return '';
+                                return `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const locationsTable = `
+                    <h3>CADT - Project Locations</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${token.unitData.issuanceData.projectData.locations.map(location => `
+                                ${Object.entries(location).map(([key, value]) => `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const ratingsTable = `
+                    <h3>CADT - Project Ratings</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${token.unitData.issuanceData.projectData.ratings.map(rating => `
+                                ${Object.entries(rating).map(([key, value]) => `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const cobenefitsTable = `
+                    <h3>CADT - Co-benefits</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${token.unitData.issuanceData.projectData.cobenefits.map(cobenefit => `
+                                ${Object.entries(cobenefit).map(([key, value]) => `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</th>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const estimationsTable = `
+                    <h3>CADT - Estimations</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${token.unitData.issuanceData.projectData.estimations.map(estimation => `
+                                ${Object.entries(estimation).map(([key, value]) => `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const relatedProjectsTable = `
+                    <h3>CADT - Related Projects</h3>
+                    <table class="green-bg">
+                        <tbody>
+                            ${token.unitData.issuanceData.projectData.relatedProjects.map(relatedProject => `
+                                ${Object.entries(relatedProject).map(([key, value]) => `
+                                    <tr>
+                                        <th>${key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>
+                                        <td>${value && value.length > 10 ? value.toString().substring(0, 10) + '...' : value || 'null'}${value ? ' <img src="assets/Copy.png" class="copy-icon" onclick="copyToClipboard(\'' + value + '\')" />' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                const commandOptions = getCommandOptions(token);
+                const commandDropdown = `
+                    <div>
+                        <label for="sidepanelCommand">Command:</label>
+                        <select id="sidepanelCommand" onchange="updateCommandArgs('${token.tradingPlatformID}')">
+                            ${commandOptions}
+                        </select>
+                        <span id="sidepanelArgs"></span>
+                        <button id="executeSidepanelCommandButton" onclick="executeSidepanelCommand('${token.tradingPlatformID}')">Execute</button>
+                    </div>
+                `;
+
+                sidepanelContent.innerHTML = `
+                    <h2>Trading Platform ID: ${token.tradingPlatformID}</h2>
+                    ${commandDropdown}
+                    <div class="burn-list-details">
+                        ${token.burned ? `<p>Retired</p><p>${token.burnedByOrgName}</p><p>${token.burnedByOrgURL}</p>` : ''}
+                        ${token.listed ? `<p>Listed</p><p>${token.listedUnitPrice}</p><p>${token.tokenName}</p>` : ''}
+                    </div>
+                    <div class="token-details">
+                        <div>${tradingPlatformTable}</div>
+                        <div>${cadtTable}</div>
+                        <div>${issuanceTable}</div>
+                        <div>${projectTable}</div>
+                        <div>${locationsTable}</div>
+                        <div>${ratingsTable}</div>
+                        <div>${cobenefitsTable}</div>
+                        <div>${estimationsTable}</div>
+                        <div>${relatedProjectsTable}</div>
+                    </div>
+                `;
+
+                sidepanel.style.width = "800px";
+
+                document.querySelectorAll('.copy-icon').forEach(icon => {
+                    icon.addEventListener('click', event => {
+                        event.stopPropagation();
+                        copyToClipboard(event.target.closest('td').innerText.trim());
+                    });
+                });
+            }
+
+            function closeSidepanel() {
+                sidepanelOpen = false;
+                document.getElementById("sidepanel").style.width = "0";
+            }
+
+            function copyToClipboard(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                log(`Copied to clipboard`);
+            }
+
+
+            async function buyToken(tradingPlatformID) {
+                log(`Buying token with Trading Platform ID: ${tradingPlatformID}`);
+            }
+
+            async function delistToken(tradingPlatformID) {
+                log(`Delisting token with Trading Platform ID: ${tradingPlatformID}`);
+            }
+
+            async function listToken(tradingPlatformID) {
+                log(`Listing token with Trading Platform ID: ${tradingPlatformID}`);
+                const listPrice = document.getElementById('listPriceInput').value;
+                const paymentToken = document.getElementById('paymentTokenInput').value;
+            }
+
+            async function burnToken(tradingPlatformID) {
+                log(`Burning token with Trading Platform ID: ${tradingPlatformID}`);
+                const burnOrgName = document.getElementById('burnOrgNameInput').value;
+                const burnOrgURL = document.getElementById('burnOrgURLInput').value;
+            }
+
+            async function ownToken(tradingPlatformID, price) {
+                log(`Owning token with Trading Platform ID: ${tradingPlatformID} for price: ${price}`);
+            }
+
+            async function splitUnits(tradingPlatformID) {
+                log(`Splitting units for Trading Platform ID: ${tradingPlatformID}`);
+                const splitMethod = document.getElementById('splitMethodInput').value;
+                const splitValue = document.getElementById('splitValueInput').value;
+            }
+
+            function getCommandOptions(token) {
+                let options = '';
+
+                if (token.burned) {
+                    console.log('Token is burned, no options available.');
+                    return options;
+                }
+
+                if (token.listed && token.owner !== clientID) {
+                    options = `<option value="buyToken">Buy</option>`;
+                } else if (token.listed) {
+                    options = `<option value="delistToken">Delist</option>`;
+                }
+
+                if (token.owner === clientID) {
+                    options += `
+                        <option value="splitUnits">Split</option>
+                        <option value="listToken">List</option>
+                        <option value="burnToken">Retire</option>
+                        <option value="transferToken">Transfer</option>
+                    `;
+                }
+
+                console.log('Generated Options:', options);
+                return options;
+            }
+
+
+
+            window.updateCommandArgs = (tradingPlatformID) => {
+                const command = document.getElementById('sidepanelCommand').value;
+                const sidepanelArgs = document.getElementById('sidepanelArgs');
+                let argsHTML = '';
+                switch (command) {
+                    case 'splitUnits':
+                        argsHTML = `
+                            <label>Split Method: <input type="text" id="splitMethodInput" /></label>
+                            <label>Split Number: <input type="text" id="splitValueInput" /></label>
+                        `;
+                        break;
+                    case 'listToken':
+                        argsHTML = `
+                            <label>Price: <input type="text" id="listPriceInput" /></label>
+                            <label>Payment Token: <input type="text" id="paymentTokenInput" /></label>
+                        `;
+                        break;
+                    case 'burnToken':
+                        argsHTML = `
+                            <label>Retired Org: <input type="text" id="burnOrgNameInput" /></label>
+                            <label>Retired Org URL: <input type="text" id="burnOrgURLInput" /></label>
+                        `;
+                        break;
+                    case 'transferToken':
+                        argsHTML = `
+                            <label>Recipient: <input type="text" id="recipientInput" /></label>
+                        `;
+                        break;
+                    case 'buyToken':
+                        argsHTML = `<p>No additional arguments needed for buying.</p>`;
+                        break;
+                    case 'delistToken':
+                        argsHTML = `<p>No additional arguments needed for delisting.</p>`;
+                        break;
+                    default:
+                        break;
+                }
+                sidepanelArgs.innerHTML = argsHTML;
+            };
+
+
+            window.executeSidepanelCommand = async(tradingPlatformID) => {
+                const command = document.getElementById('sidepanelCommand').value;
+                let args = [];
+                switch (command) {
+                    case 'splitUnits':
+                        const splitMethod = document.getElementById('splitMethodInput').value;
+                        const splitValue = document.getElementById('splitValueInput').value;
+                        args = [tradingPlatformID, splitMethod, splitValue];
+                        break;
+                    case 'listToken':
+                        const listPrice = document.getElementById('listPriceInput').value;
+                        const paymentToken = document.getElementById('paymentTokenInput').value;
+                        args = [tradingPlatformID, listPrice, paymentToken];
+                        break;
+                    case 'transferToken':
+                        const recipient = document.getElementById('recipientInput').value;
+                        args = [tradingPlatformID, recipient];
+                        break;
+                    case 'burnToken':
+                        const burnOrgName = document.getElementById('burnOrgNameInput').value;
+                        const burnOrgURL = document.getElementById('burnOrgURLInput').value;
+                        args = [tradingPlatformID, burnOrgName, burnOrgURL];
+                        break;
+                    case 'buyToken':
+                        args = [tradingPlatformID];
+                        break;
+                    case 'delistToken':
+                        args = [tradingPlatformID];
+                        break;
+                    default:
+                        break;
+                }
+                try {
+                    const response = await fetch(`/api/${command}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(args)
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Error executing ${command}: ${response.statusText}`);
+                    }
+                    const result = await response.json();
+                    log(`Executed ${command} successfully`);
+                    showSuccessPopup(`Executed ${command} successfully`);
+                } catch (error) {
+                    log(`Error executing ${command}: ${error.message}`);
+                }
+            };
+
+            function log(message) {
+                const p = document.createElement('p');
+                p.innerText = message;
+                p.style.color = 'black'; 
+                logDiv.appendChild(p);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            document.querySelectorAll('.filter-button').forEach((button, index) => {
+                button.addEventListener('click', () => {
+                    const filterBox = document.createElement('div');
+                    filterBox.classList.add('filter-box');
+                    if (index === 6) {
+                        filterBox.innerHTML = `
+                            <label for="priceTokenFilter">Payment Token:</label>
+                            <input type="text" id="priceTokenFilter">
+                            <label for="minPriceFilter">Min Price:</label>
+                            <input type="number" id="minPriceFilter">
+                            <label for="maxPriceFilter">Max Price:</label>
+                            <input type="number" id="maxPriceFilter">
+                            <button id="applyFilter">Apply</button>
+                            <button id="clearFilter">Clear</button>
+                        `;
+                    } else {
+                        filterBox.innerHTML = `
+                            <label for="filterInput">Filter:</label>
+                            <input type="text" id="filterInput">
+                            <button id="applyFilter">Apply</button>
+                            <button id="clearFilter">Clear</button>
+                        `;
+                    }
+                    document.body.appendChild(filterBox);
+                    const rect = button.getBoundingClientRect();
+                    filterBox.style.top = `${rect.bottom + window.scrollY}px`;
+                    filterBox.style.left = `${rect.left + window.scrollX}px`;
+                    filterBox.style.display = 'block';
+
+                    filterBox.querySelector('#applyFilter').addEventListener('click', () => {
+                        if (index === 6) {
+                            const paymentToken = filterBox.querySelector('#priceTokenFilter').value.trim();
+                            const minPrice = filterBox.querySelector('#minPriceFilter').value.trim();
+                            const maxPrice = filterBox.querySelector('#maxPriceFilter').value.trim();
+                            if (paymentToken || minPrice || maxPrice) {
+                                filters[index] = { paymentToken, minPrice, maxPrice };
+                            } else {
+                                delete filters[index];
+                            }
+                        } else {
+                            const filterValue = filterBox.querySelector('#filterInput').value.trim();
+                            if (filterValue) {
+                                if (!filters[index]) {
+                                    filters[index] = [];
+                                }
+                                filters[index].push(filterValue);
+                            } else {
+                                delete filters[index];
+                            }
+                        }
+                        updateFilters();
+                        updateTokensTable(sortAndFilterTokens());
+                        filterBox.remove();
+                    });
+
+                    filterBox.querySelector('#clearFilter').addEventListener('click', () => {
+                        delete filters[index];
+                        updateFilters();
+                        updateTokensTable(sortAndFilterTokens());
+                        filterBox.remove();
+                    });
+
+                    document.addEventListener('click', function(event) {
+                        if (!filterBox.contains(event.target) && event.target !== button) {
+                            filterBox.remove();
+                        }
+                    }, { once: true });
+                });
+            });
+
+            function applyFilters(token) {
+                return Object.entries(filters).every(([colIndex, filterValue]) => {
+                    const cellValue = getTokenCellValue(token, colIndex);
+                    if (colIndex === '6') {
+                        const { paymentToken, minPrice, maxPrice } = filterValue;
+                        const [price, token] = cellValue.split(' ');
+                        return (!paymentToken || paymentToken === token) &&
+                            (!minPrice || parseFloat(price) >= parseFloat(minPrice)) &&
+                            (!maxPrice || parseFloat(price) <= parseFloat(maxPrice));
+                    } else {
+                        return filterValue.some(value => cellValue.includes(value));
+                    }
+                });
+            }
+
+     
+            function getTokenCellValue(token, colIndex) {
+                switch (parseInt(colIndex)) {
+                    //trading
+                    case 0:
+                        return token.warehouseUnitID || ''; 
+                    case 1:
+                        return token.tradingPlatformID || ''; 
+                    case 2:
+                        return token.unitCount.toString() || ''; 
+                    case 3:
+                        return token.burned ? 'Burned' : token.listed ? 'Listed' : 'NA'; 
+                    case 4:
+                        return token.burnedByOrgName || 'N/A'; 
+                    case 5:
+                        return token.burned ? new Date(token.burnedAt * 1000).toLocaleDateString('en-GB') : 'N/A'; 
+                    case 6:
+                        return token.listed ? `${token.listedUnitPrice} ${token.listedPaymentToken}` : 'NA'; 
+                    case 7:
+                        return token.owner || ''; 
+                    case 8:
+                        return token.unitData?.issuanceData?.projectData?.currentRegistry || 'N/A'; 
+                    case 9:
+                        return token.unitData?.vintageYear.toString() || ''; 
+                    case 10:
+                        return token.unitData?.projectLocationId || ''; 
+                    case 11:
+                        return token.unitData?.issuanceData?.projectData?.sector || ''; 
+                    //unit
+                    case 12:
+                        return token.unitData?.orgUid || ''; 
+                    case 13:
+                        return token.unitData?.issuanceId || ''; 
+                    case 14:
+                        return token.unitData?.vintageYear.toString() || ''; 
+                    case 15:
+                        return token.unitData?.unitType || ''; 
+                    case 16:
+                        return token.unitData?.projectLocationId || ''; 
+                    case 17:
+                        return token.unitData?.serialNumberBlock || ''; 
+                    case 18:
+                        return token.unitData?.serialNumberPattern || ''; 
+                    case 19:
+                        return token.unitData?.marketplaceLink || ''; 
+                    case 20:
+                        return token.unitData?.marketplaceIdentifier || ''; 
+                    case 21:
+                        return token.unitData?.unitTags || ''; 
+                    case 22:
+                        return token.unitData?.unitStatus || ''; 
+                    case 23:
+                        return token.unitData?.unitStatusReason || ''; 
+                    case 24:
+                        return token.unitData?.unitRegistryLink || ''; 
+                    case 25:
+                        return token.unitData?.correspondingAdjustmentDeclaration || ''; 
+                    case 26:
+                        return token.unitData?.correspondingAdjustmentStatus || ''; 
+                    case 27:
+                        return token.unitData?.timeStaged || ''; 
+                    case 28:
+                        return token.unitData?.createdAt || ''; 
+                    case 29:
+                        return token.unitData?.updatedAt || ''; 
+                    // issuance
+                    case 30:
+                        return token.unitData?.issuanceData?.orgUid || ''; 
+                    case 31:
+                        return token.unitData?.issuanceData?.startDate || ''; 
+                    case 32:
+                        return token.unitData?.issuanceData?.endDate || ''; 
+                    case 33:
+                        return token.unitData?.issuanceData?.verificationApproach || ''; 
+                    case 34:
+                        return token.unitData?.issuanceData?.verificationReportDate || '';
+                    case 35:
+                        return token.unitData?.issuanceData?.verificationBody || '';
+                    case 36:
+                        return token.unitData?.issuanceData?.timeStaged || ''; 
+                    case 37:
+                        return token.unitData?.issuanceData?.createdAt || ''; 
+                    case 38:
+                        return token.unitData?.issuanceData?.updatedAt || ''; 
+                    // project
+                    case 39:
+                        return token.unitData?.issuanceData?.projectData?.projectName || ''; 
+                    case 40:
+                        return token.unitData?.issuanceData?.projectData?.projectLink || ''; 
+                    case 41:
+                        return token.unitData?.issuanceData?.projectData?.projectDeveloper || ''; 
+                    case 42:
+                        return token.unitData?.issuanceData?.projectData?.sector || ''; 
+                    case 43:
+                        return token.unitData?.issuanceData?.projectData?.projectType || ''; 
+                    case 44:
+                        return token.unitData?.issuanceData?.projectData?.projectTags || ''; 
+                    case 45:
+                        return token.unitData?.issuanceData?.projectData?.coveredByNDC || ''; 
+                    case 46:
+                        return token.unitData?.issuanceData?.projectData?.ndcInformation || ''; 
+                    case 47:
+                        return token.unitData?.issuanceData?.projectData?.projectStatus || ''; 
+                    case 48:
+                        return token.unitData?.issuanceData?.projectData?.projectStatusDate || ''; 
+                    case 49:
+                        return token.unitData?.issuanceData?.projectData?.unitMetric || ''; 
+                    case 50:
+                        return token.unitData?.issuanceData?.projectData?.methodology || ''; 
+                    case 51:
+                        return token.unitData?.issuanceData?.projectData?.validationBody || ''; 
+                    case 52:
+                        return token.unitData?.issuanceData?.projectData?.validationDate || '';
+                    case 53:
+                        return token.unitData?.issuanceData?.projectData?.timeStaged || ''; 
+                    case 54:
+                        return token.unitData?.issuanceData?.projectData?.createdAt || ''; 
+                    case 55:
+                        return token.unitData?.issuanceData?.projectData?.updatedAt || ''; 
+                    default:
+                        return '';
+                }
+            }
+
+
+
+            function updateFilters() {
+                filtersDiv.innerHTML = '';
+                Object.entries(filters).forEach(([colIndex, filterValue]) => {
+                    if (colIndex === '6') {
+                        const { paymentToken, minPrice, maxPrice } = filterValue;
+                        const filterItem = document.createElement('div');
+                        filterItem.classList.add('filter-item');
+                        filterItem.innerHTML = `
+                            <span>Column ${parseInt(colIndex) + 1}: Token ${paymentToken}, Min Price ${minPrice}, Max Price ${maxPrice}</span>
+                            <button class="remove-filter">&times;</button>
+                        `;
+                        filterItem.querySelector('.remove-filter').addEventListener('click', () => {
+                            delete filters[colIndex];
+                            updateFilters();
+                            updateTokensTable(sortAndFilterTokens());
+                        });
+                        filtersDiv.appendChild(filterItem);
+                    } else {
+                        filterValue.forEach(value => {
+                            const filterItem = document.createElement('div');
+                            filterItem.classList.add('filter-item');
+                            filterItem.innerHTML = `
+                                <span>Column ${parseInt(colIndex) + 1}: ${value}</span>
+                                <button class="remove-filter">&times;</button>
+                            `;
+                            filterItem.querySelector('.remove-filter').addEventListener('click', () => {
+                                filters[colIndex] = filters[colIndex].filter(v => v !== value);
+                                if (filters[colIndex].length === 0) {
+                                    delete filters[colIndex];
+                                }
+                                updateFilters();
+                                updateTokensTable(sortAndFilterTokens());
+                            });
+                            filtersDiv.appendChild(filterItem);
+                        });
+                    }
+                });
+            }
+
+            sortButton.addEventListener('click', () => {
+                updateTokensTable(sortAndFilterTokens());
+            });
+
+            function sortAndFilterTokens() {
+                const sortPrimary = document.getElementById('sortPrimary').value;
+                const sortPrimaryOrder = document.getElementById('sortPrimaryOrder').value;
+                const sortSecondary = document.getElementById('sortSecondary').value;
+                const sortSecondaryOrder = document.getElementById('sortSecondaryOrder').value;
+
+                const sortOrder = {
+                    asc: 1,
+                    desc: -1
+                };
+
+                const compareTokens = (a, b, sortBy, order) => {
+                    if (sortBy === 'unitCount') {
+                        return (a.unitCount - b.unitCount) * order;
+                    } else if (sortBy === 'price') {
+                        const aPrice = parseFloat(a.listedUnitPrice) || 0;
+                        const bPrice = parseFloat(b.listedUnitPrice) || 0;
+                        return (aPrice - bPrice) * order;
+                    }
+                    return 0;
+                };
+
+                return tokensData
+                    .filter(applyFilters)
+                    .sort((a, b) => {
+                        const primaryComparison = compareTokens(a, b, sortPrimary, sortOrder[sortPrimaryOrder]);
+                        if (primaryComparison !== 0) return primaryComparison;
+                        return compareTokens(a, b, sortSecondary, sortOrder[sortSecondaryOrder]);
+                    });
+            }
+
+            document.querySelectorAll('.copy-icon').forEach(icon => {
+                icon.addEventListener('click', event => {
+                    event.stopPropagation();
+                    const inputId = icon.getAttribute('data-input');
+                    const inputValue = document.getElementById(inputId).value;
+                    copyToClipboard(inputValue);
+                });
+            });
+
+
+            const segmentByDropdown = document.getElementById('segmentBy');
+
+            auditButton.addEventListener('click', () => {
+                auditPopup.style.display = 'block';
+                const filteredTokens = sortAndFilterTokens();
+                updateAuditData(filteredTokens);
+            });
+
+            closeAuditPopup.addEventListener('click', () => {
+                auditPopup.style.display = 'none';
+            });
+
+            dateBasisDropdown.addEventListener('change', () => {
+                const filteredTokens = sortAndFilterTokens();
+                updateAuditData(filteredTokens);
+            });
+
+            segmentByDropdown.addEventListener('change', () => {
+                const filteredTokens = sortAndFilterTokens();
+                updateAuditData(filteredTokens);
+            });
+
+            function updateAuditData(tokens) {
+                const dateBasis = dateBasisDropdown.value;
+                const segmentBy = segmentByDropdown.value;
+
+                const chartData = tokens
+                    .filter(token => dateBasis === 'claimedAt' || (dateBasis === 'burnedAt' && token.burned))
+                    .map(token => {
+                        let segmentValue = 'All';
+                        if (segmentBy !== 'none') {
+                            const keys = segmentBy.split('.');
+                            segmentValue = keys.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : undefined, token);
+                        }
+                        return {
+                            date: dateBasis === 'claimedAt' ? new Date(token.claimedAt * 1000).toLocaleDateString('en-GB') : new Date(token.burnedAt * 1000).toLocaleDateString('en-GB'),
+                            unitCount: token.unitCount,
+                            segment: segmentValue || 'Undefined'
+                        };
+                    });
+
+                const aggregatedData = chartData.reduce((acc, item) => {
+                    if (!acc[item.date]) {
+                        acc[item.date] = {};
+                    }
+                    if (!acc[item.date][item.segment]) {
+                        acc[item.date][item.segment] = 0;
+                    }
+                    acc[item.date][item.segment] += item.unitCount;
+                    return acc;
+                }, {});
+
+                const labels = Object.keys(aggregatedData);
+                const segments = new Set(chartData.map(item => item.segment));
+
+                const datasets = Array.from(segments).map(segment => {
+                    return {
+                        label: segment,
+                        data: labels.map(label => aggregatedData[label][segment] || 0),
+                        backgroundColor: `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, 0.2)`,
+                        borderColor: `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, 1)`,
+                        borderWidth: 1
+                    };
+                });
+
+                const totalUnitCount = tokens.reduce((acc, token) => acc + token.unitCount, 0);
+                const totalRetiredUnitCount = tokens.filter(token => token.burned).reduce((acc, token) => acc + token.unitCount, 0);
+
+                document.getElementById('totalUnitCount').innerText = `Total Unit Count: ${totalUnitCount}`;
+                document.getElementById('totalRetiredUnitCount').innerText = `Total Retired Unit Count: ${totalRetiredUnitCount}`;
+
+                const ctx = document.getElementById('auditChart').getContext('2d');
+
+                if (window.auditChartInstance) {
+                    window.auditChartInstance.destroy();
+                }
+
+                window.auditChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            },
+                            x: {
+                                stacked: true
+                            },
+                            y: {
+                                stacked: true
+                            }
+                        }
+                    }
+                });
+            }
+
+
+
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+
+</html>

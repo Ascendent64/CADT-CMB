@@ -1,0 +1,118 @@
+//Create Project
+
+curl --location --request POST 'http://localhost:31310/v1/projects' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "projectId": "789",
+    "originProjectId": "123",
+    "registryOfOrigin": "Sweden National Registry",
+    "currentRegistry": "Global Carbon Council",
+    "program": null,
+    "projectName": "Stop Desertification",
+    "projectLink": "http://desertificationtest.com",
+    "projectDeveloper": "Dev 2",
+    "sector": "Fugitive emissions from fuel (solid, oil and gas)",
+    "projectType": "Coal Mine Methane",
+    "projectTags": null,
+    "coveredByNDC": "Outside NDC",
+    "ndcInformation": null,
+    "projectStatus": "Registered",
+    "projectStatusDate": "2022-02-02T00:00:00.000Z",
+    "unitMetric": "tCO2e",
+    "methodology": "Substitution of CO2 from fossil or mineral origin by CO2 from biogenic residual sources in the production of inorganic compounds --- Version 3.0",
+    "validationBody": null,
+    "validationDate": null,
+    "timeStaged": 1646975765,
+    "createdAt": "2022-03-11T05:17:55.427Z",
+    "updatedAt": "2022-03-11T05:17:55.427Z",
+    "projectLocations": [{
+        "country": "Latvia",
+        "inCountryRegion": null,
+        "geographicIdentifier": "Sample Identifier",
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.425Z",
+        "updatedAt": "2022-03-11T05:17:55.425Z"
+    }],
+    "projectRatings": [{
+        "ratingType": "CCQI",
+        "ratingRangeHighest": "100",
+        "ratingRangeLowest": "0",
+        "rating": "97",
+        "ratingLink": "http://testlink.com",
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.427Z",
+        "updatedAt": "2022-03-11T05:17:55.427Z"
+    }],
+    "coBenefits": [{
+        "cobenefit": "Sample Benefit",
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.424Z",
+        "updatedAt": "2022-03-11T05:17:55.424Z"
+    }],
+    "estimations": [{
+        "creditingPeriodStart": "2022-02-04T00:00:00.000Z",
+        "creditingPeriodEnd": "2022-03-04T00:00:00.000Z",
+        "unitCount": 100,
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.427Z",
+        "updatedAt": "2022-03-11T05:17:55.427Z"
+    }],
+    "relatedProjects": [{
+        "relatedProjectId": "333",
+        "relationshipType": "Sample",
+        "registry": "ABC",
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.427Z",
+        "updatedAt": "2022-03-11T05:17:55.427Z"
+    }],
+    "issuances": [{
+        "startDate": "2022-01-02T00:00:00.000Z",
+        "endDate": "2022-02-11T00:00:00.000Z",
+        "verificationApproach": "Sample Approach",
+        "verificationReportDate": "2022-03-16T00:00:00.000Z",
+        "verificationBody": "Sample Body",
+        "timeStaged": 1646975765,
+        "createdAt": "2022-03-11T05:17:55.426Z",
+        "updatedAt": "2022-03-11T05:17:55.426Z"
+    }]
+}'
+
+// Obtain issuances's ID and projectLocation's ID by listing subscribed projects.
+
+curl --location --request GET 'localhost:31310/v1/projects' --header 'Content-Type: application/json'
+
+//Create Units For Project 
+// Modify the issuance's id and projectLocationId to the fields obtained above.
+//marketplaceIdentifier is set to org1 clientID of the hyperledger fabric test-network for authenticated tokenization on CMB.
+
+curl --location -g --request POST 'localhost:31310/v1/units' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "unitBlockStart": "A345",
+    "unitBlockEnd": "B567",
+    "unitCount": 222,
+    "projectLocationId": "<Project Location ID", // Modify
+    "unitOwner": "Sample Owner",
+    "countryJurisdictionOfOwner": "Belize",
+    "inCountryJurisdictionOfOwner": null,
+    "vintageYear": 2014,
+    "unitType": "Reduction - technical",
+    "marketplace": null,
+    "marketplaceLink": null,
+    "marketplaceIdentifier": "eDUwOTo6Q049QWRtaW5Ab3JnMS5leGFtcGxlLmNvbSxPVT1hZG1pbixMPVNhbiBGcmFuY2lzY28sU1Q9Q2FsaWZvcm5pYSxDPVVTOjpDTj1jYS5vcmcxLmV4YW1wbGUuY29tLE89b3JnMS5leGFtcGxlLmNvbSxMPVNhbiBGcmFuY2lzY28sU1Q9Q2FsaWZvcm5pYSxDPVVT",
+    "unitTags": null,
+    "unitStatus": "Buffer",
+    "unitStatusReason": null,
+    "unitRegistryLink": "sampleurl.com",
+    "correspondingAdjustmentDeclaration": "Unknown",
+    "correspondingAdjustmentStatus": "Pending",
+    "issuance": {
+        "id": "<Issuance ID>", // Modify
+        "warehouseProjectId": "70bb9ab7-2f0f-4eb1-9df3-9c549d9ff4d9",
+        "startDate": "2022-01-02T00:00:00.000Z",
+        "endDate": "2022-02-11T00:00:00.000Z",
+        "verificationApproach": "Sample Approach",
+        "verificationReportDate": "2022-03-16T00:00:00.000Z",
+        "verificationBody": "Sample Body"
+    }
+}'

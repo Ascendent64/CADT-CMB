@@ -1,0 +1,166 @@
+
+# services:
+#   chia_base:
+#     build: .
+#     image: chia_base:latest
+#     container_name: chia_base_container
+#     environment:
+#       - VIRTUAL_ENV=/opt/venv
+#       - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+#       - CHIA_ROOT=/root/.chia/testnet
+#       - NVM_DIR=/root/.nvm
+#       - NODE_VERSION=20.16.0
+#     volumes:
+#       - chia_data_base:/root/.chia
+#       - nvm_data_base:/root/.nvm
+#       - keys_data_base:/keys
+#     ports:
+#       - "8575:8575" 
+
+#   chia_instance1:
+#     image: chia_base:latest
+#     container_name: chia_instance1
+#     environment:
+#       - VIRTUAL_ENV=/opt/venv
+#       - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+#       - CHIA_ROOT=/root/.chia/testnet
+#       - NVM_DIR=/root/.nvm
+#       - NODE_VERSION=20.16.0
+#     volumes:
+#       - chia_data_instance1:/root/.chia
+#       - nvm_data_instance1:/root/.nvm
+#       - keys_data_instance1:/keys
+#     ports:
+#       - "8576:8575" 
+
+#   chia_instance2:
+#     image: chia_base:latest
+#     container_name: chia_instance2
+#     environment:
+#       - VIRTUAL_ENV=/opt/venv
+#       - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+#       - CHIA_ROOT=/root/.chia/testnet
+#       - NVM_DIR=/root/.nvm
+#       - NODE_VERSION=20.16.0
+#     volumes:
+#       - chia_data_instance2:/root/.chia
+#       - nvm_data_instance2:/root/.nvm
+#       - keys_data_instance2:/keys
+#     ports:
+#       - "8577:8575"
+
+# volumes:
+#   chia_data_base:
+#   nvm_data_base:
+#   keys_data_base:
+#   chia_data_instance1:
+#   nvm_data_instance1:
+#   keys_data_instance1:
+#   chia_data_instance2:
+#   nvm_data_instance2:
+#   keys_data_instance2:
+
+
+#####################################################################
+
+services:
+  chia_base:
+    build: .
+    image: chia_base:latest
+    container_name: chia_base_container
+    environment:
+      - VIRTUAL_ENV=/opt/venv
+      - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - CHIA_ROOT=/root/.chia/testnet
+      - NVM_DIR=/root/.nvm
+      - NODE_VERSION=20.16.0
+    volumes:
+      - chia_data_base:/root/.chia
+      - nvm_data_base:/root/.nvm
+      - keys_data_base:/keys
+    ports:
+      - "8575:8575"  
+
+  mysql_chia_instance1:
+    image: mysql:latest
+    container_name: mysql_chia_instance1
+    environment:
+      MYSQL_ROOT_PASSWORD: <1st - ROOT PASSWORD> # Modify
+      MYSQL_DATABASE: <1st - DATABASE> #  Modify
+      MYSQL_USER: <1st - USER> #  Modify
+      MYSQL_PASSWORD: <1st - PASSWORD> #  Modify
+    ports:
+      - "3309:3306"
+    command: --bind-address=0.0.0.0
+    volumes:
+      - mysql_data_chia_instance1:/var/lib/mysql
+  chia_instance1:
+    image: chia_base:latest
+    container_name: chia_instance1
+    environment:
+      - VIRTUAL_ENV=/opt/venv
+      - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - CHIA_ROOT=/root/.chia/testnet
+      - NVM_DIR=/root/.nvm
+      - NODE_VERSION=20.16.0
+      - DB_USERNAME= <1st - USER> #  Modify
+      - DB_PASSWORD= <1st - PASSWORD> #  Modify
+      - DB_NAME= <1st - DATABASE> #  Modify
+      - DB_HOST=mysql_chia_instance1
+    volumes:
+      - chia_data_instance1:/root/.chia
+      - nvm_data_instance1:/root/.nvm
+      - keys_data_instance1:/keys
+    depends_on:
+      - mysql_chia_instance1
+    ports:
+      - "8576:8575" 
+
+  mysql_chia_instance2:
+    image: mysql:latest
+    container_name: mysql_chia_instance2
+    environment:
+      MYSQL_ROOT_PASSWORD: <2nd - ROOT PASSWORD> #  Modify
+      MYSQL_DATABASE: <2nd - DATABASE> #  Modify
+      MYSQL_USER: <2nd - USER> #  Modify 
+      MYSQL_PASSWORD: <2nd - PASSWORD> #  Modify
+    ports:
+      - "3310:3306"
+    command: --bind-address=0.0.0.0
+    volumes:
+      - mysql_data_chia_instance2:/var/lib/mysql
+
+  chia_instance2:
+    image: chia_base:latest
+    container_name: chia_instance2
+    environment:
+      - VIRTUAL_ENV=/opt/venv
+      - PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - CHIA_ROOT=/root/.chia/testnet
+      - NVM_DIR=/root/.nvm
+      - NODE_VERSION=20.16.0
+      - DB_USERNAME= <2nd - USER> #  Modify
+      - DB_PASSWORD= <2nd - PASSWORD> #  Modify
+      - DB_NAME= <2nd - DATABASE> #  Modify
+      - DB_HOST=mysql_chia_instance2
+    volumes:
+      - chia_data_instance2:/root/.chia
+      - nvm_data_instance2:/root/.nvm
+      - keys_data_instance2:/keys
+    depends_on:
+      - mysql_chia_instance2
+    ports:
+      - "8577:8575" 
+
+volumes:
+  chia_data_base:
+  nvm_data_base:
+  keys_data_base:
+  chia_data_instance1:
+  nvm_data_instance1:
+  keys_data_instance1:
+  mysql_data_chia_instance1:
+  chia_data_instance2:
+  nvm_data_instance2:
+  keys_data_instance2:
+  mysql_data_chia_instance2:

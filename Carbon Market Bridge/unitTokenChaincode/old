@@ -1,0 +1,3318 @@
+// package main
+
+// import (
+// 	"crypto/sha256"
+// 	"database/sql"
+// 	"encoding/hex"
+// 	"encoding/json"
+// 	"fmt"
+// 	"log"
+// 	"strconv"
+// 	"strings"
+
+// 	"github.com/go-sql-driver/mysql"
+// 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+// )
+
+// // Token represents a token
+// type Token struct {
+// 	WarehouseUnitID string `json:"warehouseUnitID"`
+// 	UnitHash        string `json:"unitHash"`
+// 	Burned          bool   `json:"burned"`
+// 	BurnedByOrgName string `json:"burnedByOrgName"`
+// 	BurnedByOrgURL  string `json:"burnedByOrgURL"`
+// 	Owner           string `json:"owner"`
+// 	Listed          bool   `json:"listed"`
+// }
+
+// // Listing represents a listing of a carbon credit token
+// type Listing struct {
+// 	WarehouseUnitID string `json:"warehouseUnitID"`
+// 	Seller          string `json:"seller"`
+// 	Price           int    `json:"price"`
+// 	PaymentToken    string `json:"paymentToken"`
+// }
+
+// // Unit represents a unit in the database
+// type Unit struct {
+// 	UnitBlockStart                     sql.NullString
+// 	UnitBlockEnd                       sql.NullString
+// 	UnitCount                          sql.NullInt64
+// 	WarehouseUnitID                    string
+// 	IssuanceID                         sql.NullString
+// 	ProjectLocationID                  sql.NullString
+// 	OrgUID                             string
+// 	UnitOwner                          sql.NullString
+// 	CountryJurisdictionOfOwner         sql.NullString
+// 	InCountryJurisdictionOfOwner       sql.NullString
+// 	SerialNumberBlock                  sql.NullString
+// 	SerialNumberPattern                sql.NullString
+// 	VintageYear                        sql.NullInt64
+// 	UnitType                           sql.NullString
+// 	Marketplace                        sql.NullString
+// 	MarketplaceLink                    sql.NullString
+// 	MarketplaceIdentifier              sql.NullString
+// 	UnitTags                           sql.NullString
+// 	UnitStatus                         sql.NullString
+// 	UnitStatusReason                   sql.NullString
+// 	UnitRegistryLink                   sql.NullString
+// 	CorrespondingAdjustmentDeclaration sql.NullString
+// 	CorrespondingAdjustmentStatus      sql.NullString
+// 	TimeStaged                         sql.NullInt64
+// 	CreatedAt                          sql.NullString
+// 	UpdatedAt                          sql.NullString
+// }
+
+// // MarketplaceChaincode provides functions for managing the marketplace
+// type MarketplaceChaincode struct {
+// 	contractapi.Contract
+// }
+
+// // Initialize a read-only user for the SQL database
+// var db *sql.DB
+
+// func initializeDB() error {
+// 	cfg := mysql.Config{
+// 		User:                 "HLTradingChaincode",
+// 		Passwd:               "password123",
+// 		Net:                  "tcp",
+// 		Addr:                 "192.168.1.252:3306",
+// 		DBName:               "CADTDatabase",
+// 		AllowNativePasswords: true,
+// 	}
+// 	var err error
+// 	db, err = sql.Open("mysql", cfg.FormatDSN())
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	pingErr := db.Ping()
+// 	if pingErr != nil {
+// 		return pingErr
+// 	}
+// 	fmt.Println("Connected to the database successfully!")
+// 	return nil
+// }
+
+// // ClaimUnitByID claims a unit by its WarehouseUnitID
+// func (m *MarketplaceChaincode) ClaimUnitByID(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting ClaimUnitByID function")
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Client ID: %s", clientID)
+
+// 	// Check if the unit is already claimed
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes != nil {
+// 		log.Printf("Unit %s already claimed", warehouseUnitID)
+// 		return "unit already claimed", nil
+// 	}
+
+// 	// Fetch the unit from the database
+// 	unit, err := fetchUnitByID(warehouseUnitID)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			return "unit does not exist", nil
+// 		}
+// 		log.Printf("Failed to fetch unit: %v", err)
+// 		return "", fmt.Errorf("failed to fetch unit: %v", err)
+// 	}
+// 	log.Printf("Fetched unit: %+v", unit)
+
+// 	// Check if the clientID matches the MarketplaceIdentifier
+// 	if unit.MarketplaceIdentifier.String != clientID {
+// 		log.Printf("Caller is not authorized to claim the unit: %s", warehouseUnitID)
+// 		return "caller is not authorized to claim the unit", nil
+// 	}
+
+// 	// Create a token
+// 	unitData := concatenateUnitData(unit)
+// 	unitHash := hashUnitData(unitData)
+// 	token := &Token{
+// 		WarehouseUnitID: unit.WarehouseUnitID,
+// 		UnitHash:        unitHash,
+// 		Burned:          false,
+// 		Owner:           clientID,
+// 		Listed:          false,
+// 	}
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	// Save the token to the ledger
+// 	err = ctx.GetStub().PutState(unit.WarehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	// Add the warehouseUnitID to the claimed list (world state)
+// 	err = ctx.GetStub().PutState("CLAIMED_"+unit.WarehouseUnitID, []byte("claimed"))
+// 	if err != nil {
+// 		log.Printf("Failed to put claimed unit to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put claimed unit to world state: %v", err)
+// 	}
+
+// 	log.Println("ClaimUnitByID function completed successfully")
+// 	return "unit successfully claimed", nil
+// }
+
+// // BurnToken marks a token as burned
+// func (m *MarketplaceChaincode) BurnToken(ctx contractapi.TransactionContextInterface, warehouseUnitID, orgName, orgURL string) (string, error) {
+// 	log.Printf("Starting BurnToken function for WarehouseUnitID: %s", warehouseUnitID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "no state found for WarehouseUnitID", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", warehouseUnitID, token.Owner)
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", warehouseUnitID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be burned", warehouseUnitID)
+// 		return "token is listed and cannot be burned", nil
+// 	}
+
+// 	// Mark the token as burned
+// 	token.Burned = true
+// 	token.BurnedByOrgName = orgName
+// 	token.BurnedByOrgURL = orgURL
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(warehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	log.Printf("BurnToken function completed successfully for WarehouseUnitID: %s", warehouseUnitID)
+// 	return "token successfully burned", nil
+// }
+
+// // TransferToken transfers a token to a new owner
+// func (m *MarketplaceChaincode) TransferToken(ctx contractapi.TransactionContextInterface, warehouseUnitID, newOwner string) (string, error) {
+// 	log.Println("Starting TransferToken function")
+
+// 	// Fetch the token from the ledger
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", warehouseUnitID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be transferred", warehouseUnitID)
+// 		return "token is burned and cannot be transferred", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be transferred", warehouseUnitID)
+// 		return "token is listed and cannot be transferred", nil
+// 	}
+
+// 	// Verify the caller is the owner or authorized entity
+// 	callerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller ID for transfer: %s", callerID)
+
+// 	if token.Owner != callerID && callerID != "marketplace-client-id" {
+// 		log.Printf("Caller %s is not the owner or authorized entity for token %s", callerID, warehouseUnitID)
+// 		return "caller is not authorized to transfer the token", nil
+// 	}
+
+// 	// Update the owner
+// 	token.Owner = newOwner
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(warehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Printf("TransferToken function completed successfully. New owner of token %s: %s", warehouseUnitID, newOwner)
+// 	return "token successfully transferred", nil
+// } // ListToken lists a carbon credit token for sale
+// func (m *MarketplaceChaincode) ListToken(ctx contractapi.TransactionContextInterface, warehouseUnitID string, price int, paymentToken string) (string, error) {
+// 	log.Println("Starting ListToken function")
+
+// 	// Directly call the GetState function instead of using InvokeChaincode
+// 	token, err := m.GetState(ctx, warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to get token state: %v", err)
+// 		return "", fmt.Errorf("failed to get token state: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", warehouseUnitID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be listed", warehouseUnitID)
+// 		return "token is burned and cannot be listed", nil
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", warehouseUnitID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Set the token as listed
+// 	token.Listed = true
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(warehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Create a listing
+// 	listing := &Listing{
+// 		WarehouseUnitID: warehouseUnitID,
+// 		Seller:          clientID,
+// 		Price:           price,
+// 		PaymentToken:    paymentToken,
+// 	}
+// 	listingBytes, err := json.Marshal(listing)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to marshal listing: %v", err)
+// 	}
+
+// 	// Save the listing to the ledger
+// 	err = ctx.GetStub().PutState("LISTING_"+warehouseUnitID, listingBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put listing to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put listing to world state: %v", err)
+// 	}
+
+// 	log.Println("ListToken function completed successfully")
+// 	return "token successfully listed", nil
+// }
+
+// // DelistToken removes a listed token from sale
+// func (m *MarketplaceChaincode) DelistToken(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting DelistToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the caller is the seller
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if listing.Seller != clientID {
+// 		log.Printf("Caller is not the seller of token %s", warehouseUnitID)
+// 		return "caller is not the seller of the token", nil
+// 	}
+
+// 	// Set the token as not listed
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(warehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("DelistToken function completed successfully")
+// 	return "token successfully delisted", nil
+// }
+
+// // BuyToken allows a buyer to purchase a listed carbon credit token
+// func (m *MarketplaceChaincode) BuyToken(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting BuyToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the buyer has enough tokens of the specified type
+// 	buyerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Buyer client ID: %s", buyerID)
+
+// 	// Chaincode-to-chaincode query to get the buyer's balance from paymenttokenchaincode
+// 	response := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("GetBalance"), []byte(buyerID), []byte(listing.PaymentToken)}, "mychannel")
+// 	if response.Status != 200 {
+// 		log.Printf("Failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 		return "", fmt.Errorf("failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 	}
+
+// 	var buyerBalance int
+// 	err = json.Unmarshal(response.Payload, &buyerBalance)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal buyer balance: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal buyer balance: %v", err)
+// 	}
+
+// 	if buyerBalance < listing.Price {
+// 		log.Printf("Buyer %s has insufficient funds of %s", buyerID, listing.PaymentToken)
+// 		return "buyer has insufficient funds", nil
+// 	}
+
+// 	// Transfer tokens from the buyer to the seller using paymenttokenchaincode
+// 	transferResponse := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("TransferTokens"), []byte(listing.PaymentToken), []byte(listing.Seller), []byte(strconv.Itoa(listing.Price))}, "mychannel")
+// 	if transferResponse.Status != 200 {
+// 		log.Printf("Failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 		return "", fmt.Errorf("failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 	}
+
+// 	// Set the token as not listed before transferring ownership
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+// 	token.Owner = buyerID
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(warehouseUnitID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("BuyToken function completed successfully")
+// 	return "token successfully purchased", nil
+// }
+
+// // GetState retrieves the state of a specific unit from the ledger
+// func (m *MarketplaceChaincode) GetState(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (*Token, error) {
+// 	log.Printf("Starting GetState function for WarehouseUnitID: %s", warehouseUnitID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return nil, fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for WarehouseUnitID: %s", warehouseUnitID)
+// 		return nil, fmt.Errorf("no state found for WarehouseUnitID: %s", warehouseUnitID)
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return nil, fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	log.Printf("GetState function completed successfully for WarehouseUnitID: %s. Token data: %+v", warehouseUnitID, token)
+// 	return &token, nil
+// }
+
+// // concatenateUnitData concatenates all fields of a Unit into a single string
+// func concatenateUnitData(unit *Unit) string {
+// 	values := []string{
+// 		unit.UnitBlockStart.String,
+// 		unit.UnitBlockEnd.String,
+// 		fmt.Sprintf("%d", unit.UnitCount.Int64),
+// 		unit.WarehouseUnitID,
+// 		unit.IssuanceID.String,
+// 		unit.ProjectLocationID.String,
+// 		unit.OrgUID,
+// 		unit.UnitOwner.String,
+// 		unit.CountryJurisdictionOfOwner.String,
+// 		unit.InCountryJurisdictionOfOwner.String,
+// 		unit.SerialNumberBlock.String,
+// 		unit.SerialNumberPattern.String,
+// 		fmt.Sprintf("%d", unit.VintageYear.Int64),
+// 		unit.UnitType.String,
+// 		unit.Marketplace.String,
+// 		unit.MarketplaceLink.String,
+// 		unit.MarketplaceIdentifier.String,
+// 		unit.UnitTags.String,
+// 		unit.UnitStatus.String,
+// 		unit.UnitStatusReason.String,
+// 		unit.UnitRegistryLink.String,
+// 		unit.CorrespondingAdjustmentDeclaration.String,
+// 		unit.CorrespondingAdjustmentStatus.String,
+// 		fmt.Sprintf("%d", unit.TimeStaged.Int64),
+// 		unit.CreatedAt.String,
+// 		unit.UpdatedAt.String,
+// 	}
+// 	return strings.Join(values, "|")
+// }
+
+// // fetchUnitByID fetches a unit by its ID from the SQL database
+// func fetchUnitByID(warehouseUnitID string) (*Unit, error) {
+// 	row := db.QueryRow("SELECT unitBlockStart, unitBlockEnd, unitCount, warehouseUnitId, issuanceId, projectLocationId, orgUid, unitOwner, countryJurisdictionOfOwner, inCountryJurisdictionOfOwner, serialNumberBlock, serialNumberPattern, vintageYear, unitType, marketplace, marketplaceLink, marketplaceIdentifier, unitTags, unitStatus, unitStatusReason, unitRegistryLink, correspondingAdjustmentDeclaration, correspondingAdjustmentStatus, timeStaged, createdAt, updatedAt FROM units WHERE warehouseUnitID = ?", warehouseUnitID)
+// 	var unit Unit
+// 	err := row.Scan(
+// 		&unit.UnitBlockStart,
+// 		&unit.UnitBlockEnd,
+// 		&unit.UnitCount,
+// 		&unit.WarehouseUnitID,
+// 		&unit.IssuanceID,
+// 		&unit.ProjectLocationID,
+// 		&unit.OrgUID,
+// 		&unit.UnitOwner,
+// 		&unit.CountryJurisdictionOfOwner,
+// 		&unit.InCountryJurisdictionOfOwner,
+// 		&unit.SerialNumberBlock,
+// 		&unit.SerialNumberPattern,
+// 		&unit.VintageYear,
+// 		&unit.UnitType,
+// 		&unit.Marketplace,
+// 		&unit.MarketplaceLink,
+// 		&unit.MarketplaceIdentifier,
+// 		&unit.UnitTags,
+// 		&unit.UnitStatus,
+// 		&unit.UnitStatusReason,
+// 		&unit.UnitRegistryLink,
+// 		&unit.CorrespondingAdjustmentDeclaration,
+// 		&unit.CorrespondingAdjustmentStatus,
+// 		&unit.TimeStaged,
+// 		&unit.CreatedAt,
+// 		&unit.UpdatedAt,
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &unit, nil
+// }
+
+// // hashUnitData generates a SHA-256 hash of the unit data
+// func hashUnitData(data string) string {
+// 	hash := sha256.New()
+// 	hash.Write([]byte(data))
+// 	return hex.EncodeToString(hash.Sum(nil))
+// }
+
+// func main() {
+// 	if err := initializeDB(); err != nil {
+// 		log.Panicf("Failed to initialize database: %v", err)
+// 	}
+
+// 	chaincode, err := contractapi.NewChaincode(&MarketplaceChaincode{})
+// 	if err != nil {
+// 		log.Panicf("Error creating marketplace chaincode: %v", err)
+// 	}
+
+// 	if err := chaincode.Start(); err != nil {
+// 		log.Panicf("Error starting marketplace chaincode: %v", err)
+// 	}
+// }
+
+// package main
+
+// import (
+// 	"crypto/sha256"
+// 	"database/sql"
+// 	"encoding/hex"
+// 	"encoding/json"
+// 	"fmt"
+// 	"log"
+// 	"strconv"
+// 	"strings"
+
+// 	"github.com/go-sql-driver/mysql"
+// 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+// )
+
+// // Token represents a token
+// type Token struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	WarehouseUnitID   string `json:"warehouseUnitID"`
+// 	UnitHash          string `json:"unitHash"`
+// 	Burned            bool   `json:"burned"`
+// 	BurnedByOrgName   string `json:"burnedByOrgName"`
+// 	BurnedByOrgURL    string `json:"burnedByOrgURL"`
+// 	Owner             string `json:"owner"`
+// 	Listed            bool   `json:"listed"`
+// 	UnitCount         int64  `json:"unitCount"`
+// }
+
+// // Listing represents a listing of a carbon credit token
+// type Listing struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	Seller            string `json:"seller"`
+// 	Price             int    `json:"price"`
+// 	PaymentToken      string `json:"paymentToken"`
+// }
+
+// // Unit represents a unit in the database
+// type Unit struct {
+// 	UnitBlockStart                     sql.NullString
+// 	UnitBlockEnd                       sql.NullString
+// 	UnitCount                          sql.NullInt64
+// 	WarehouseUnitID                    string
+// 	IssuanceID                         sql.NullString
+// 	ProjectLocationID                  sql.NullString
+// 	OrgUID                             string
+// 	UnitOwner                          sql.NullString
+// 	CountryJurisdictionOfOwner         sql.NullString
+// 	InCountryJurisdictionOfOwner       sql.NullString
+// 	SerialNumberBlock                  sql.NullString
+// 	SerialNumberPattern                sql.NullString
+// 	VintageYear                        sql.NullInt64
+// 	UnitType                           sql.NullString
+// 	Marketplace                        sql.NullString
+// 	MarketplaceLink                    sql.NullString
+// 	MarketplaceIdentifier              sql.NullString
+// 	UnitTags                           sql.NullString
+// 	UnitStatus                         sql.NullString
+// 	UnitStatusReason                   sql.NullString
+// 	UnitRegistryLink                   sql.NullString
+// 	CorrespondingAdjustmentDeclaration sql.NullString
+// 	CorrespondingAdjustmentStatus      sql.NullString
+// 	TimeStaged                         sql.NullInt64
+// 	CreatedAt                          sql.NullString
+// 	UpdatedAt                          sql.NullString
+// }
+
+// // MarketplaceChaincode provides functions for managing the marketplace
+// type MarketplaceChaincode struct {
+// 	contractapi.Contract
+// }
+
+// // Initialize a read-only user for the SQL database
+// var db *sql.DB
+
+// func initializeDB() error {
+// 	cfg := mysql.Config{
+// 		User:                 "HLTradingChaincode",
+// 		Passwd:               "password123",
+// 		Net:                  "tcp",
+// 		Addr:                 "192.168.1.252:3306",
+// 		DBName:               "CADTDatabase",
+// 		AllowNativePasswords: true,
+// 	}
+// 	var err error
+// 	db, err = sql.Open("mysql", cfg.FormatDSN())
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	pingErr := db.Ping()
+// 	if pingErr != nil {
+// 		return pingErr
+// 	}
+// 	fmt.Println("Connected to the database successfully!")
+// 	return nil
+// }
+
+// // ClaimUnitByID claims a unit by its WarehouseUnitID
+// func (m *MarketplaceChaincode) ClaimUnitByID(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting ClaimUnitByID function")
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Client ID: %s", clientID)
+
+// 	// Check if the unit is already claimed
+// 	claimedStatus, err := ctx.GetStub().GetState("CLAIMED_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if claimedStatus != nil {
+// 		log.Printf("Unit %s already claimed", warehouseUnitID)
+// 		return "unit already claimed", nil
+// 	}
+
+// 	// Fetch the unit from the database
+// 	log.Println("Fetching unit from database")
+// 	unit, err := fetchUnitByID(warehouseUnitID)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			log.Println("Unit does not exist in database")
+// 			return "unit does not exist", nil
+// 		}
+// 		log.Printf("Failed to fetch unit: %v", err)
+// 		return "", fmt.Errorf("failed to fetch unit: %v", err)
+// 	}
+// 	log.Printf("Fetched unit: %+v", unit)
+
+// 	// Check if the clientID matches the MarketplaceIdentifier
+// 	log.Printf("Checking if client ID matches MarketplaceIdentifier")
+// 	log.Printf("Client ID: %s, MarketplaceIdentifier: %s", clientID, unit.MarketplaceIdentifier.String)
+// 	if unit.MarketplaceIdentifier.String != clientID {
+// 		log.Printf("Caller is not authorized to claim the unit: %s", warehouseUnitID)
+// 		return "caller is not authorized to claim the unit", nil
+// 	}
+
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	i := 0
+// 	newID, err := generateUniqueID(ctx, i)
+// 	tradingPlatformID := newID
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+
+// 	// Check if TradingPlatformID already exists in the ledger
+// 	log.Printf("Checking if TradingPlatformID %s already exists in the ledger", tradingPlatformID)
+// 	existingTokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to check existing token in ledger: %v", err)
+// 		return "", fmt.Errorf("failed to check existing token in ledger: %v", err)
+// 	}
+// 	if existingTokenBytes != nil {
+// 		log.Printf("TradingPlatformID %s already exists in ledger", tradingPlatformID)
+// 		log.Printf("Existing token data for TradingPlatformID: %s", string(existingTokenBytes))
+// 		return "TradingPlatformID already exists in ledger", nil
+// 	}
+
+// 	// Create a token
+// 	unitData := concatenateUnitData(unit)
+// 	unitHash := hashUnitData(unitData)
+// 	token := &Token{
+// 		TradingPlatformID: tradingPlatformID,
+// 		WarehouseUnitID:   unit.WarehouseUnitID,
+// 		UnitHash:          unitHash,
+// 		Burned:            false,
+// 		Owner:             clientID,
+// 		Listed:            false,
+// 		UnitCount:         unit.UnitCount.Int64,
+// 	}
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+// 	log.Printf("Token marshaled: %s", string(tokenBytes))
+
+// 	// Save the token to the ledger
+// 	log.Println("Saving token to ledger")
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	// Mark the unit as claimed
+// 	log.Println("Marking the unit as claimed")
+// 	err = ctx.GetStub().PutState("CLAIMED_"+warehouseUnitID, []byte("claimed"))
+// 	if err != nil {
+// 		log.Printf("Failed to mark unit as claimed in world state: %v", err)
+// 		return "", fmt.Errorf("failed to mark unit as claimed in world state: %v", err)
+// 	}
+
+// 	log.Println("ClaimUnitByID function completed successfully")
+// 	return "unit successfully claimed", nil
+// }
+
+// // BurnToken marks a token as burned
+// func (m *MarketplaceChaincode) BurnToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, orgName, orgURL string) (string, error) {
+// 	log.Printf("Starting BurnToken function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "no state found for TradingPlatformID", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be burned", tradingPlatformID)
+// 		return "token is listed and cannot be burned", nil
+// 	}
+
+// 	// Mark the token as burned
+// 	token.Burned = true
+// 	token.BurnedByOrgName = orgName
+// 	token.BurnedByOrgURL = orgURL
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	log.Printf("BurnToken function completed successfully for TradingPlatformID: %s", tradingPlatformID)
+// 	return "token successfully burned", nil
+// }
+
+// // TransferToken transfers a token to a new owner
+// func (m *MarketplaceChaincode) TransferToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, newOwner string) (string, error) {
+// 	log.Println("Starting TransferToken function")
+
+// 	// Fetch the token from the ledger
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be transferred", tradingPlatformID)
+// 		return "token is burned and cannot be transferred", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be transferred", tradingPlatformID)
+// 		return "token is listed and cannot be transferred", nil
+// 	}
+
+// 	// Verify the caller is the owner or authorized entity
+// 	callerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller ID for transfer: %s", callerID)
+
+// 	if token.Owner != callerID && callerID != "marketplace-client-id" {
+// 		log.Printf("Caller %s is not the owner or authorized entity for token %s", callerID, tradingPlatformID)
+// 		return "caller is not authorized to transfer the token", nil
+// 	}
+
+// 	// Update the owner
+// 	token.Owner = newOwner
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Printf("TransferToken function completed successfully. New owner of token %s: %s", tradingPlatformID, newOwner)
+// 	return "token successfully transferred", nil
+// }
+
+// // ListToken lists a carbon credit token for sale
+// func (m *MarketplaceChaincode) ListToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string, price int, paymentToken string) (string, error) {
+// 	log.Println("Starting ListToken function")
+
+// 	token, err := m.GetState(ctx, tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to get token state: %v", err)
+// 		return "", fmt.Errorf("failed to get token state: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be listed", tradingPlatformID)
+// 		return "token is burned and cannot be listed", nil
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Set the token as listed
+// 	token.Listed = true
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Create a listing
+// 	listing := &Listing{
+// 		TradingPlatformID: tradingPlatformID,
+// 		Seller:            clientID,
+// 		Price:             price,
+// 		PaymentToken:      paymentToken,
+// 	}
+// 	listingBytes, err := json.Marshal(listing)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to marshal listing: %v", err)
+// 	}
+
+// 	// Save the listing to the ledger
+// 	err = ctx.GetStub().PutState("LISTING_"+tradingPlatformID, listingBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put listing to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put listing to world state: %v", err)
+// 	}
+
+// 	log.Println("ListToken function completed successfully")
+// 	return "token successfully listed", nil
+// }
+
+// // DelistToken removes a listed token from sale
+// func (m *MarketplaceChaincode) DelistToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting DelistToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the caller is the seller
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if listing.Seller != clientID {
+// 		log.Printf("Caller is not the seller of token %s", tradingPlatformID)
+// 		return "caller is not the seller of the token", nil
+// 	}
+
+// 	// Set the token as not listed
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("DelistToken function completed successfully")
+// 	return "token successfully delisted", nil
+// }
+
+// // BuyToken allows a buyer to purchase a listed carbon credit token
+// func (m *MarketplaceChaincode) BuyToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting BuyToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the buyer has enough tokens of the specified type
+// 	buyerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Buyer client ID: %s", buyerID)
+
+// 	// Chaincode-to-chaincode query to get the buyer's balance from paymenttokenchaincode
+// 	response := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("GetBalance"), []byte(buyerID), []byte(listing.PaymentToken)}, "mychannel")
+// 	if response.Status != 200 {
+// 		log.Printf("Failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 		return "", fmt.Errorf("failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 	}
+
+// 	var buyerBalance int
+// 	err = json.Unmarshal(response.Payload, &buyerBalance)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal buyer balance: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal buyer balance: %v", err)
+// 	}
+
+// 	if buyerBalance < listing.Price {
+// 		log.Printf("Buyer %s has insufficient funds of %s", buyerID, listing.PaymentToken)
+// 		return "buyer has insufficient funds", nil
+// 	}
+
+// 	// Transfer tokens from the buyer to the seller using paymenttokenchaincode
+// 	transferResponse := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("TransferTokens"), []byte(listing.PaymentToken), []byte(listing.Seller), []byte(strconv.Itoa(listing.Price))}, "mychannel")
+// 	if transferResponse.Status != 200 {
+// 		log.Printf("Failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 		return "", fmt.Errorf("failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 	}
+
+// 	// Set the token as not listed before transferring ownership
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+// 	token.Owner = buyerID
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("BuyToken function completed successfully")
+// 	return "token successfully purchased", nil
+// }
+
+// // GetState retrieves the state of a specific unit from the ledger
+// func (m *MarketplaceChaincode) GetState(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (*Token, error) {
+// 	log.Printf("Starting GetState function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return nil, fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return nil, fmt.Errorf("no state found for TradingPlatformID: %s", tradingPlatformID)
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return nil, fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	log.Printf("GetState function completed successfully for TradingPlatformID: %s. Token data: %+v", tradingPlatformID, token)
+// 	return &token, nil
+// }
+
+// // ListAllTokens retrieves all tokens from the ledger
+// func (m *MarketplaceChaincode) ListAllTokens(ctx contractapi.TransactionContextInterface) (string, error) {
+// 	log.Println("Starting ListAllTokens function")
+// 	startKey := ""
+// 	endKey := ""
+
+// 	resultsIterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	defer resultsIterator.Close()
+
+// 	var tokens []*Token
+// 	for resultsIterator.HasNext() {
+// 		queryResponse, err := resultsIterator.Next()
+// 		if err != nil {
+// 			return "", err
+// 		}
+
+// 		log.Printf("Raw query result: %s", string(queryResponse.Value))
+
+// 		var token Token
+// 		err = json.Unmarshal(queryResponse.Value, &token)
+// 		if err != nil {
+// 			log.Printf("Skipping non-token entry: %s", string(queryResponse.Value))
+// 			continue
+// 		}
+// 		tokens = append(tokens, &token)
+// 	}
+
+// 	tokenBytes, err := json.Marshal(tokens)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	log.Println("ListAllTokens function completed successfully")
+// 	return string(tokenBytes), nil
+// }
+
+// // concatenateUnitData concatenates all fields of a Unit into a single string
+// func concatenateUnitData(unit *Unit) string {
+// 	values := []string{
+// 		unit.UnitBlockStart.String,
+// 		unit.UnitBlockEnd.String,
+// 		fmt.Sprintf("%d", unit.UnitCount.Int64),
+// 		unit.WarehouseUnitID,
+// 		unit.IssuanceID.String,
+// 		unit.ProjectLocationID.String,
+// 		unit.OrgUID,
+// 		unit.UnitOwner.String,
+// 		unit.CountryJurisdictionOfOwner.String,
+// 		unit.InCountryJurisdictionOfOwner.String,
+// 		unit.SerialNumberBlock.String,
+// 		unit.SerialNumberPattern.String,
+// 		fmt.Sprintf("%d", unit.VintageYear.Int64),
+// 		unit.UnitType.String,
+// 		unit.Marketplace.String,
+// 		unit.MarketplaceLink.String,
+// 		unit.MarketplaceIdentifier.String,
+// 		unit.UnitTags.String,
+// 		unit.UnitStatus.String,
+// 		unit.UnitStatusReason.String,
+// 		unit.UnitRegistryLink.String,
+// 		unit.CorrespondingAdjustmentDeclaration.String,
+// 		unit.CorrespondingAdjustmentStatus.String,
+// 		fmt.Sprintf("%d", unit.TimeStaged.Int64),
+// 		unit.CreatedAt.String,
+// 		unit.UpdatedAt.String,
+// 	}
+// 	return strings.Join(values, "|")
+// }
+
+// // fetchUnitByID fetches a unit by its ID from the SQL database
+// func fetchUnitByID(warehouseUnitID string) (*Unit, error) {
+// 	row := db.QueryRow("SELECT unitBlockStart, unitBlockEnd, unitCount, warehouseUnitId, issuanceId, projectLocationId, orgUid, unitOwner, countryJurisdictionOfOwner, inCountryJurisdictionOfOwner, serialNumberBlock, serialNumberPattern, vintageYear, unitType, marketplace, marketplaceLink, marketplaceIdentifier, unitTags, unitStatus, unitStatusReason, unitRegistryLink, correspondingAdjustmentDeclaration, correspondingAdjustmentStatus, timeStaged, createdAt, updatedAt FROM units WHERE warehouseUnitID = ?", warehouseUnitID)
+// 	var unit Unit
+// 	err := row.Scan(
+// 		&unit.UnitBlockStart,
+// 		&unit.UnitBlockEnd,
+// 		&unit.UnitCount,
+// 		&unit.WarehouseUnitID,
+// 		&unit.IssuanceID,
+// 		&unit.ProjectLocationID,
+// 		&unit.OrgUID,
+// 		&unit.UnitOwner,
+// 		&unit.CountryJurisdictionOfOwner,
+// 		&unit.InCountryJurisdictionOfOwner,
+// 		&unit.SerialNumberBlock,
+// 		&unit.SerialNumberPattern,
+// 		&unit.VintageYear,
+// 		&unit.UnitType,
+// 		&unit.Marketplace,
+// 		&unit.MarketplaceLink,
+// 		&unit.MarketplaceIdentifier,
+// 		&unit.UnitTags,
+// 		&unit.UnitStatus,
+// 		&unit.UnitStatusReason,
+// 		&unit.UnitRegistryLink,
+// 		&unit.CorrespondingAdjustmentDeclaration,
+// 		&unit.CorrespondingAdjustmentStatus,
+// 		&unit.TimeStaged,
+// 		&unit.CreatedAt,
+// 		&unit.UpdatedAt,
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &unit, nil
+// }
+
+// // hashUnitData generates a SHA-256 hash of the unit data
+// func hashUnitData(data string) string {
+// 	hash := sha256.New()
+// 	hash.Write([]byte(data))
+// 	return hex.EncodeToString(hash.Sum(nil))
+// }
+
+// func generateUniqueID(ctx contractapi.TransactionContextInterface, iterator int) (string, error) {
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	timestamp, err := ctx.GetStub().GetTxTimestamp()
+// 	if err != nil {
+// 		log.Printf("Failed to get transaction timestamp: %v", err)
+// 		return "", fmt.Errorf("failed to get transaction timestamp: %v", err)
+// 	}
+// 	// Convert iterator to bytes and append to timestamp bytes
+// 	iteratorBytes := []byte(strconv.Itoa(iterator))
+// 	timeBytes := append([]byte(strconv.FormatInt(timestamp.Seconds, 10)), iteratorBytes...)
+// 	hash := sha256.New()
+// 	hash.Write(timeBytes)
+// 	tradingPlatformID := fmt.Sprintf("TPID-%s", hex.EncodeToString(hash.Sum(nil))[:10]) // Using first 10 characters of hash
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+// 	return tradingPlatformID, nil
+// }
+
+// // SplitUnits splits a unit into smaller units based on the provided ratio or division
+// func (m *MarketplaceChaincode) SplitUnits(ctx contractapi.TransactionContextInterface, tradingPlatformID string, method string, value int) (string, error) {
+// 	log.Printf("Starting SplitUnits function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be split", tradingPlatformID)
+// 		return "token is listed and cannot be split", nil
+// 	}
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be split", tradingPlatformID)
+// 		return "token is burned and cannot be split", nil
+// 	}
+
+// 	log.Printf("Splitting token using method: %s, value: %d", method, value)
+// 	// Perform the split
+// 	var newTokens []*Token
+// 	switch method {
+// 	case "ratio":
+// 		// Split into two parts based on the ratio
+// 		firstPart := (token.UnitCount * int64(value)) / 100
+// 		secondPart := token.UnitCount - firstPart
+
+// 		log.Printf("First part: %d, Second part: %d", firstPart, secondPart)
+// 		for i := 0; i < 2; i++ {
+// 			newUnitCount := firstPart
+// 			if i == 1 {
+// 				newUnitCount = secondPart
+// 			}
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         newUnitCount,
+// 			})
+// 		}
+
+// 	case "divide":
+// 		// Split into equal parts
+// 		if value <= 0 || token.UnitCount%int64(value) != 0 {
+// 			return "", fmt.Errorf("invalid value for division")
+// 		}
+// 		partCount := token.UnitCount / int64(value)
+
+// 		log.Printf("Splitting into %d parts, each with %d units", value, partCount)
+// 		for i := 0; i < value; i++ {
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         partCount,
+// 			})
+// 		}
+
+// 	default:
+// 		return "", fmt.Errorf("invalid split method")
+// 	}
+
+// 	// Save the new tokens to the ledger
+// 	for _, newToken := range newTokens {
+// 		newTokenBytes, err := json.Marshal(newToken)
+// 		if err != nil {
+// 			log.Printf("Failed to marshal new token: %v", err)
+// 			return "", fmt.Errorf("failed to marshal new token: %v", err)
+// 		}
+
+// 		err = ctx.GetStub().PutState(newToken.TradingPlatformID, newTokenBytes)
+// 		if err != nil {
+// 			log.Printf("Failed to put new token to world state: %v", err)
+// 			return "", fmt.Errorf("failed to put new token to world state: %v", err)
+// 		}
+// 	}
+
+// 	// Delete the original token from the ledger
+// 	err = ctx.GetStub().DelState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete original token from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete original token from world state: %v", err)
+// 	}
+
+// 	log.Println("SplitUnits function completed successfully")
+// 	return "units successfully split", nil
+// }
+
+// func main() {
+// 	if err := initializeDB(); err != nil {
+// 		log.Panicf("Failed to initialize database: %v", err)
+// 	}
+
+// 	chaincode, err := contractapi.NewChaincode(&MarketplaceChaincode{})
+// 	if err != nil {
+// 		log.Panicf("Error creating marketplace chaincode: %v", err)
+// 	}
+
+// 	if err := chaincode.Start(); err != nil {
+// 		log.Panicf("Error starting marketplace chaincode: %v", err)
+// 	}
+// }
+
+// package main
+
+// import (
+// 	"crypto/sha256"
+// 	"database/sql"
+// 	"encoding/hex"
+// 	"encoding/json"
+// 	"fmt"
+// 	"log"
+// 	"strconv"
+// 	"strings"
+
+// 	"github.com/go-sql-driver/mysql"
+// 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+// )
+
+// // Token represents a token
+// type Token struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	WarehouseUnitID   string `json:"warehouseUnitID"`
+// 	UnitHash          string `json:"unitHash"`
+// 	Burned            bool   `json:"burned"`
+// 	BurnedByOrgName   string `json:"burnedByOrgName"`
+// 	BurnedByOrgURL    string `json:"burnedByOrgURL"`
+// 	Owner             string `json:"owner"`
+// 	Listed            bool   `json:"listed"`
+// 	UnitCount         int64  `json:"unitCount"`
+// 	ClaimedAt         int64  `json:"claimedAt"`
+// }
+
+// // Listing represents a listing of a carbon credit token
+// type Listing struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	Seller            string `json:"seller"`
+// 	Price             int    `json:"price"`
+// 	PaymentToken      string `json:"paymentToken"`
+// }
+
+// // Unit represents a unit in the database
+// type Unit struct {
+// 	UnitBlockStart                     sql.NullString
+// 	UnitBlockEnd                       sql.NullString
+// 	UnitCount                          sql.NullInt64
+// 	WarehouseUnitID                    string
+// 	IssuanceID                         sql.NullString
+// 	ProjectLocationID                  sql.NullString
+// 	OrgUID                             string
+// 	UnitOwner                          sql.NullString
+// 	CountryJurisdictionOfOwner         sql.NullString
+// 	InCountryJurisdictionOfOwner       sql.NullString
+// 	SerialNumberBlock                  sql.NullString
+// 	SerialNumberPattern                sql.NullString
+// 	VintageYear                        sql.NullInt64
+// 	UnitType                           sql.NullString
+// 	Marketplace                        sql.NullString
+// 	MarketplaceLink                    sql.NullString
+// 	MarketplaceIdentifier              sql.NullString
+// 	UnitTags                           sql.NullString
+// 	UnitStatus                         sql.NullString
+// 	UnitStatusReason                   sql.NullString
+// 	UnitRegistryLink                   sql.NullString
+// 	CorrespondingAdjustmentDeclaration sql.NullString
+// 	CorrespondingAdjustmentStatus      sql.NullString
+// 	TimeStaged                         sql.NullInt64
+// 	CreatedAt                          sql.NullString
+// 	UpdatedAt                          sql.NullString
+// }
+
+// // MarketplaceChaincode provides functions for managing the marketplace
+// type MarketplaceChaincode struct {
+// 	contractapi.Contract
+// }
+
+// // Initialize a read-only user for the SQL database
+// var db *sql.DB
+
+// func initializeDB() error {
+// 	cfg := mysql.Config{
+// 		User:                 "HLTradingChaincode",
+// 		Passwd:               "password123",
+// 		Net:                  "tcp",
+// 		Addr:                 "192.168.1.252:3306",
+// 		DBName:               "CADTDatabase",
+// 		AllowNativePasswords: true,
+// 	}
+// 	var err error
+// 	db, err = sql.Open("mysql", cfg.FormatDSN())
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	pingErr := db.Ping()
+// 	if pingErr != nil {
+// 		return pingErr
+// 	}
+// 	fmt.Println("Connected to the database successfully!")
+// 	return nil
+// }
+
+// // ClaimUnitByID claims a unit by its WarehouseUnitID
+// func (m *MarketplaceChaincode) ClaimUnitByID(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting ClaimUnitByID function")
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Client ID: %s", clientID)
+
+// 	// Check if the unit is already claimed
+// 	claimedStatus, err := ctx.GetStub().GetState("CLAIMED_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if claimedStatus != nil {
+// 		log.Printf("Unit %s already claimed", warehouseUnitID)
+// 		return "unit already claimed", nil
+// 	}
+
+// 	// Fetch the unit from the database
+// 	log.Println("Fetching unit from database")
+// 	unit, err := fetchUnitByID(warehouseUnitID)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			log.Println("Unit does not exist in database")
+// 			return "unit does not exist", nil
+// 		}
+// 		log.Printf("Failed to fetch unit: %v", err)
+// 		return "", fmt.Errorf("failed to fetch unit: %v", err)
+// 	}
+// 	log.Printf("Fetched unit: %+v", unit)
+
+// 	// Check if the clientID matches the MarketplaceIdentifier
+// 	log.Printf("Checking if client ID matches MarketplaceIdentifier")
+// 	log.Printf("Client ID: %s, MarketplaceIdentifier: %s", clientID, unit.MarketplaceIdentifier.String)
+// 	if unit.MarketplaceIdentifier.String != clientID {
+// 		log.Printf("Caller is not authorized to claim the unit: %s", warehouseUnitID)
+// 		return "caller is not authorized to claim the unit", nil
+// 	}
+
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	i := 0
+// 	newID, err := generateUniqueID(ctx, i)
+// 	tradingPlatformID := newID
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+
+// 	// Check if TradingPlatformID already exists in the ledger
+// 	log.Printf("Checking if TradingPlatformID %s already exists in the ledger", tradingPlatformID)
+// 	existingTokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to check existing token in ledger: %v", err)
+// 		return "", fmt.Errorf("failed to check existing token in ledger: %v", err)
+// 	}
+// 	if existingTokenBytes != nil {
+// 		log.Printf("TradingPlatformID %s already exists in ledger", tradingPlatformID)
+// 		log.Printf("Existing token data for TradingPlatformID: %s", string(existingTokenBytes))
+// 		return "TradingPlatformID already exists in ledger", nil
+// 	}
+
+// 	// Get transaction timestamp
+// 	timestamp, err := ctx.GetStub().GetTxTimestamp()
+// 	if err != nil {
+// 		log.Printf("Failed to get transaction timestamp: %v", err)
+// 		return "", fmt.Errorf("failed to get transaction timestamp: %v", err)
+// 	}
+// 	claimedAt := timestamp.Seconds
+
+// 	// Create a token
+// 	unitData := concatenateUnitData(unit)
+// 	unitHash := hashUnitData(unitData)
+// 	token := &Token{
+// 		TradingPlatformID: tradingPlatformID,
+// 		WarehouseUnitID:   unit.WarehouseUnitID,
+// 		UnitHash:          unitHash,
+// 		Burned:            false,
+// 		Owner:             clientID,
+// 		Listed:            false,
+// 		UnitCount:         unit.UnitCount.Int64,
+// 		ClaimedAt:         claimedAt,
+// 	}
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+// 	log.Printf("Token marshaled: %s", string(tokenBytes))
+
+// 	// Save the token to the ledger
+// 	log.Println("Saving token to ledger")
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	// Mark the unit as claimed
+// 	log.Println("Marking the unit as claimed")
+// 	err = ctx.GetStub().PutState("CLAIMED_"+warehouseUnitID, []byte("claimed"))
+// 	if err != nil {
+// 		log.Printf("Failed to mark unit as claimed in world state: %v", err)
+// 		return "", fmt.Errorf("failed to mark unit as claimed in world state: %v", err)
+// 	}
+
+// 	log.Println("ClaimUnitByID function completed successfully")
+// 	return "unit successfully claimed", nil
+// }
+
+// // BurnToken marks a token as burned
+// func (m *MarketplaceChaincode) BurnToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, orgName, orgURL string) (string, error) {
+// 	log.Printf("Starting BurnToken function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "no state found for TradingPlatformID", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be burned", tradingPlatformID)
+// 		return "token is listed and cannot be burned", nil
+// 	}
+
+// 	// Mark the token as burned
+// 	token.Burned = true
+// 	token.BurnedByOrgName = orgName
+// 	token.BurnedByOrgURL = orgURL
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	log.Printf("BurnToken function completed successfully for TradingPlatformID: %s", tradingPlatformID)
+// 	return "token successfully burned", nil
+// }
+
+// // TransferToken transfers a token to a new owner
+// func (m *MarketplaceChaincode) TransferToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, newOwner string) (string, error) {
+// 	log.Println("Starting TransferToken function")
+
+// 	// Fetch the token from the ledger
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be transferred", tradingPlatformID)
+// 		return "token is burned and cannot be transferred", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be transferred", tradingPlatformID)
+// 		return "token is listed and cannot be transferred", nil
+// 	}
+
+// 	// Verify the caller is the owner or authorized entity
+// 	callerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller ID for transfer: %s", callerID)
+
+// 	if token.Owner != callerID && callerID != "marketplace-client-id" {
+// 		log.Printf("Caller %s is not the owner or authorized entity for token %s", callerID, tradingPlatformID)
+// 		return "caller is not authorized to transfer the token", nil
+// 	}
+
+// 	// Update the owner
+// 	token.Owner = newOwner
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Printf("TransferToken function completed successfully. New owner of token %s: %s", tradingPlatformID, newOwner)
+// 	return "token successfully transferred", nil
+// }
+
+// // ListToken lists a carbon credit token for sale
+// func (m *MarketplaceChaincode) ListToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string, price int, paymentToken string) (string, error) {
+// 	log.Println("Starting ListToken function")
+
+// 	token, err := m.GetState(ctx, tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to get token state: %v", err)
+// 		return "", fmt.Errorf("failed to get token state: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be listed", tradingPlatformID)
+// 		return "token is burned and cannot be listed", nil
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Set the token as listed
+// 	token.Listed = true
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Create a listing
+// 	listing := &Listing{
+// 		TradingPlatformID: tradingPlatformID,
+// 		Seller:            clientID,
+// 		Price:             price,
+// 		PaymentToken:      paymentToken,
+// 	}
+// 	listingBytes, err := json.Marshal(listing)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to marshal listing: %v", err)
+// 	}
+
+// 	// Save the listing to the ledger
+// 	err = ctx.GetStub().PutState("LISTING_"+tradingPlatformID, listingBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put listing to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put listing to world state: %v", err)
+// 	}
+
+// 	log.Println("ListToken function completed successfully")
+// 	return "token successfully listed", nil
+// }
+
+// // DelistToken removes a listed token from sale
+// func (m *MarketplaceChaincode) DelistToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting DelistToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the caller is the seller
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if listing.Seller != clientID {
+// 		log.Printf("Caller is not the seller of token %s", tradingPlatformID)
+// 		return "caller is not the seller of the token", nil
+// 	}
+
+// 	// Set the token as not listed
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("DelistToken function completed successfully")
+// 	return "token successfully delisted", nil
+// }
+
+// // BuyToken allows a buyer to purchase a listed carbon credit token
+// func (m *MarketplaceChaincode) BuyToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting BuyToken function")
+
+// 	// Fetch the listing from the ledger
+// 	listingBytes, err := ctx.GetStub().GetState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if listingBytes == nil {
+// 		log.Printf("No listing found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "listing does not exist", nil
+// 	}
+
+// 	var listing Listing
+// 	err = json.Unmarshal(listingBytes, &listing)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal listing: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal listing: %v", err)
+// 	}
+
+// 	// Verify the buyer has enough tokens of the specified type
+// 	buyerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Buyer client ID: %s", buyerID)
+
+// 	// Chaincode-to-chaincode query to get the buyer's balance from paymenttokenchaincode
+// 	response := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("GetBalance"), []byte(buyerID), []byte(listing.PaymentToken)}, "mychannel")
+// 	if response.Status != 200 {
+// 		log.Printf("Failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 		return "", fmt.Errorf("failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 	}
+
+// 	var buyerBalance int
+// 	err = json.Unmarshal(response.Payload, &buyerBalance)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal buyer balance: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal buyer balance: %v", err)
+// 	}
+
+// 	if buyerBalance < listing.Price {
+// 		log.Printf("Buyer %s has insufficient funds of %s", buyerID, listing.PaymentToken)
+// 		return "buyer has insufficient funds", nil
+// 	}
+
+// 	// Transfer tokens from the buyer to the seller using paymenttokenchaincode
+// 	transferResponse := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("TransferTokens"), []byte(listing.PaymentToken), []byte(listing.Seller), []byte(strconv.Itoa(listing.Price))}, "mychannel")
+// 	if transferResponse.Status != 200 {
+// 		log.Printf("Failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 		return "", fmt.Errorf("failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 	}
+
+// 	// Set the token as not listed before transferring ownership
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	token.Listed = false
+// 	token.Owner = buyerID
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	// Delete the listing from the ledger
+// 	err = ctx.GetStub().DelState("LISTING_" + tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete listing from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete listing from world state: %v", err)
+// 	}
+
+// 	log.Println("BuyToken function completed successfully")
+// 	return "token successfully purchased", nil
+// }
+
+// // GetState retrieves the state of a specific unit from the ledger
+// func (m *MarketplaceChaincode) GetState(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (*Token, error) {
+// 	log.Printf("Starting GetState function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return nil, fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return nil, fmt.Errorf("no state found for TradingPlatformID: %s", tradingPlatformID)
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return nil, fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	log.Printf("GetState function completed successfully for TradingPlatformID: %s. Token data: %+v", tradingPlatformID, token)
+// 	return &token, nil
+// }
+
+// // ListAllTokens retrieves all tokens from the ledger
+// func (m *MarketplaceChaincode) ListAllTokens(ctx contractapi.TransactionContextInterface) (string, error) {
+// 	log.Println("Starting ListAllTokens function")
+// 	startKey := ""
+// 	endKey := ""
+
+// 	resultsIterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	defer resultsIterator.Close()
+
+// 	var tokens []*Token
+// 	for resultsIterator.HasNext() {
+// 		queryResponse, err := resultsIterator.Next()
+// 		if err != nil {
+// 			return "", err
+// 		}
+
+// 		log.Printf("Raw query result: %s", string(queryResponse.Value))
+
+// 		var token Token
+// 		err = json.Unmarshal(queryResponse.Value, &token)
+// 		if err != nil {
+// 			log.Printf("Skipping non-token entry: %s", string(queryResponse.Value))
+// 			continue
+// 		}
+// 		tokens = append(tokens, &token)
+// 	}
+
+// 	tokenBytes, err := json.Marshal(tokens)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	log.Println("ListAllTokens function completed successfully")
+// 	return string(tokenBytes), nil
+// }
+
+// // concatenateUnitData concatenates all fields of a Unit into a single string
+// func concatenateUnitData(unit *Unit) string {
+// 	values := []string{
+// 		unit.UnitBlockStart.String,
+// 		unit.UnitBlockEnd.String,
+// 		fmt.Sprintf("%d", unit.UnitCount.Int64),
+// 		unit.WarehouseUnitID,
+// 		unit.IssuanceID.String,
+// 		unit.ProjectLocationID.String,
+// 		unit.OrgUID,
+// 		unit.UnitOwner.String,
+// 		unit.CountryJurisdictionOfOwner.String,
+// 		unit.InCountryJurisdictionOfOwner.String,
+// 		unit.SerialNumberBlock.String,
+// 		unit.SerialNumberPattern.String,
+// 		fmt.Sprintf("%d", unit.VintageYear.Int64),
+// 		unit.UnitType.String,
+// 		unit.Marketplace.String,
+// 		unit.MarketplaceLink.String,
+// 		unit.MarketplaceIdentifier.String,
+// 		unit.UnitTags.String,
+// 		unit.UnitStatus.String,
+// 		unit.UnitStatusReason.String,
+// 		unit.UnitRegistryLink.String,
+// 		unit.CorrespondingAdjustmentDeclaration.String,
+// 		unit.CorrespondingAdjustmentStatus.String,
+// 		fmt.Sprintf("%d", unit.TimeStaged.Int64),
+// 		unit.CreatedAt.String,
+// 		unit.UpdatedAt.String,
+// 	}
+// 	return strings.Join(values, "|")
+// }
+
+// // fetchUnitByID fetches a unit by its ID from the SQL database
+// func fetchUnitByID(warehouseUnitID string) (*Unit, error) {
+// 	row := db.QueryRow("SELECT unitBlockStart, unitBlockEnd, unitCount, warehouseUnitId, issuanceId, projectLocationId, orgUid, unitOwner, countryJurisdictionOfOwner, inCountryJurisdictionOfOwner, serialNumberBlock, serialNumberPattern, vintageYear, unitType, marketplace, marketplaceLink, marketplaceIdentifier, unitTags, unitStatus, unitStatusReason, unitRegistryLink, correspondingAdjustmentDeclaration, correspondingAdjustmentStatus, timeStaged, createdAt, updatedAt FROM units WHERE warehouseUnitID = ?", warehouseUnitID)
+// 	var unit Unit
+// 	err := row.Scan(
+// 		&unit.UnitBlockStart,
+// 		&unit.UnitBlockEnd,
+// 		&unit.UnitCount,
+// 		&unit.WarehouseUnitID,
+// 		&unit.IssuanceID,
+// 		&unit.ProjectLocationID,
+// 		&unit.OrgUID,
+// 		&unit.UnitOwner,
+// 		&unit.CountryJurisdictionOfOwner,
+// 		&unit.InCountryJurisdictionOfOwner,
+// 		&unit.SerialNumberBlock,
+// 		&unit.SerialNumberPattern,
+// 		&unit.VintageYear,
+// 		&unit.UnitType,
+// 		&unit.Marketplace,
+// 		&unit.MarketplaceLink,
+// 		&unit.MarketplaceIdentifier,
+// 		&unit.UnitTags,
+// 		&unit.UnitStatus,
+// 		&unit.UnitStatusReason,
+// 		&unit.UnitRegistryLink,
+// 		&unit.CorrespondingAdjustmentDeclaration,
+// 		&unit.CorrespondingAdjustmentStatus,
+// 		&unit.TimeStaged,
+// 		&unit.CreatedAt,
+// 		&unit.UpdatedAt,
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &unit, nil
+// }
+
+// // hashUnitData generates a SHA-256 hash of the unit data
+// func hashUnitData(data string) string {
+// 	hash := sha256.New()
+// 	hash.Write([]byte(data))
+// 	return hex.EncodeToString(hash.Sum(nil))
+// }
+
+// // generateUniqueID generates a unique ID based on the transaction timestamp and iterator
+// func generateUniqueID(ctx contractapi.TransactionContextInterface, iterator int) (string, error) {
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	timestamp, err := ctx.GetStub().GetTxTimestamp()
+// 	if err != nil {
+// 		log.Printf("Failed to get transaction timestamp: %v", err)
+// 		return "", fmt.Errorf("failed to get transaction timestamp: %v", err)
+// 	}
+// 	// Convert iterator to bytes and append to timestamp bytes
+// 	iteratorBytes := []byte(strconv.Itoa(iterator))
+// 	timeBytes := append([]byte(strconv.FormatInt(timestamp.Seconds, 10)), iteratorBytes...)
+// 	hash := sha256.New()
+// 	hash.Write(timeBytes)
+// 	tradingPlatformID := hex.EncodeToString(hash.Sum(nil))[:10] // Using first 10 characters of hash
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+// 	return tradingPlatformID, nil
+// }
+
+// // SplitUnits splits a unit into smaller units based on the provided ratio or division
+// func (m *MarketplaceChaincode) SplitUnits(ctx contractapi.TransactionContextInterface, tradingPlatformID string, method string, value int) (string, error) {
+// 	log.Printf("Starting SplitUnits function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be split", tradingPlatformID)
+// 		return "token is listed and cannot be split", nil
+// 	}
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be split", tradingPlatformID)
+// 		return "token is burned and cannot be split", nil
+// 	}
+
+// 	log.Printf("Splitting token using method: %s, value: %d", method, value)
+// 	// Perform the split
+// 	var newTokens []*Token
+// 	switch method {
+// 	case "ratio":
+// 		// Split into two parts based on the ratio
+// 		firstPart := (token.UnitCount * int64(value)) / 100
+// 		secondPart := token.UnitCount - firstPart
+
+// 		log.Printf("First part: %d, Second part: %d", firstPart, secondPart)
+// 		for i := 0; i < 2; i++ {
+// 			newUnitCount := firstPart
+// 			if i == 1 {
+// 				newUnitCount = secondPart
+// 			}
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         newUnitCount,
+// 				ClaimedAt:         token.ClaimedAt,
+// 			})
+// 		}
+
+// 	case "divide":
+// 		// Split into equal parts
+// 		if value <= 0 || token.UnitCount%int64(value) != 0 {
+// 			return "", fmt.Errorf("invalid value for division")
+// 		}
+// 		partCount := token.UnitCount / int64(value)
+
+// 		log.Printf("Splitting into %d parts, each with %d units", value, partCount)
+// 		for i := 0; i < value; i++ {
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         partCount,
+// 				ClaimedAt:         token.ClaimedAt,
+// 			})
+// 		}
+
+// 	default:
+// 		return "", fmt.Errorf("invalid split method")
+// 	}
+
+// 	// Save the new tokens to the ledger
+// 	for _, newToken := range newTokens {
+// 		newTokenBytes, err := json.Marshal(newToken)
+// 		if err != nil {
+// 			log.Printf("Failed to marshal new token: %v", err)
+// 			return "", fmt.Errorf("failed to marshal new token: %v", err)
+// 		}
+
+// 		err = ctx.GetStub().PutState(newToken.TradingPlatformID, newTokenBytes)
+// 		if err != nil {
+// 			log.Printf("Failed to put new token to world state: %v", err)
+// 			return "", fmt.Errorf("failed to put new token to world state: %v", err)
+// 		}
+// 	}
+
+// 	// Delete the original token from the ledger
+// 	err = ctx.GetStub().DelState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete original token from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete original token from world state: %v", err)
+// 	}
+
+// 	log.Println("SplitUnits function completed successfully")
+// 	return "units successfully split", nil
+// }
+
+// func main() {
+// 	if err := initializeDB(); err != nil {
+// 		log.Panicf("Failed to initialize database: %v", err)
+// 	}
+
+// 	chaincode, err := contractapi.NewChaincode(&MarketplaceChaincode{})
+// 	if err != nil {
+// 		log.Panicf("Error creating marketplace chaincode: %v", err)
+// 	}
+
+// 	if err := chaincode.Start(); err != nil {
+// 		log.Panicf("Error starting marketplace chaincode: %v", err)
+// 	}
+// }
+
+// package main
+
+// import (
+// 	"crypto/sha256"
+// 	"database/sql"
+// 	"encoding/hex"
+// 	"encoding/json"
+// 	"fmt"
+// 	"log"
+// 	"strconv"
+// 	"strings"
+
+// 	"github.com/go-sql-driver/mysql"
+// 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+// )
+
+// // Token represents a token
+// type Token struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	WarehouseUnitID   string `json:"warehouseUnitID"`
+// 	UnitHash          string `json:"unitHash"`
+// 	Burned            bool   `json:"burned,omitempty"`
+// 	BurnedByOrgName   string `json:"burnedByOrgName,omitempty"`
+// 	BurnedByOrgURL    string `json:"burnedByOrgURL,omitempty"`
+// 	Owner             string `json:"owner"`
+// 	Listed            bool   `json:"listed"`
+// 	UnitCount         int64  `json:"unitCount"`
+// 	ClaimedAt         int64  `json:"claimedAt"`
+// 	ListedPrice       string `json:"listedPrice,omitempty"`
+// 	TokenName         string `json:"tokenName,omitempty"`
+// }
+
+// // Listing represents a listing of a carbon credit token
+// type Listing struct {
+// 	TradingPlatformID string `json:"tradingPlatformID"`
+// 	Seller            string `json:"seller"`
+// 	Price             int    `json:"price"`
+// 	PaymentToken      string `json:"paymentToken"`
+// }
+
+// // Unit represents a unit in the database
+// type Unit struct {
+// 	UnitBlockStart                     sql.NullString
+// 	UnitBlockEnd                       sql.NullString
+// 	UnitCount                          sql.NullInt64
+// 	WarehouseUnitID                    string
+// 	IssuanceID                         sql.NullString
+// 	ProjectLocationID                  sql.NullString
+// 	OrgUID                             string
+// 	UnitOwner                          sql.NullString
+// 	CountryJurisdictionOfOwner         sql.NullString
+// 	InCountryJurisdictionOfOwner       sql.NullString
+// 	SerialNumberBlock                  sql.NullString
+// 	SerialNumberPattern                sql.NullString
+// 	VintageYear                        sql.NullInt64
+// 	UnitType                           sql.NullString
+// 	Marketplace                        sql.NullString
+// 	MarketplaceLink                    sql.NullString
+// 	MarketplaceIdentifier              sql.NullString
+// 	UnitTags                           sql.NullString
+// 	UnitStatus                         sql.NullString
+// 	UnitStatusReason                   sql.NullString
+// 	UnitRegistryLink                   sql.NullString
+// 	CorrespondingAdjustmentDeclaration sql.NullString
+// 	CorrespondingAdjustmentStatus      sql.NullString
+// 	TimeStaged                         sql.NullInt64
+// 	CreatedAt                          sql.NullString
+// 	UpdatedAt                          sql.NullString
+// }
+
+// // MarketplaceChaincode provides functions for managing the marketplace
+// type MarketplaceChaincode struct {
+// 	contractapi.Contract
+// }
+
+// // Initialize a read-only user for the SQL database
+// var db *sql.DB
+
+// func initializeDB() error {
+// 	cfg := mysql.Config{
+// 		User:                 "HLTradingChaincode",
+// 		Passwd:               "password123",
+// 		Net:                  "tcp",
+// 		Addr:                 "192.168.1.252:3306",
+// 		DBName:               "CADTDatabase",
+// 		AllowNativePasswords: true,
+// 	}
+// 	var err error
+// 	db, err = sql.Open("mysql", cfg.FormatDSN())
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	pingErr := db.Ping()
+// 	if pingErr != nil {
+// 		return pingErr
+// 	}
+// 	fmt.Println("Connected to the database successfully!")
+// 	return nil
+// }
+
+// // ClaimUnitByID claims a unit by its WarehouseUnitID
+// func (m *MarketplaceChaincode) ClaimUnitByID(ctx contractapi.TransactionContextInterface, warehouseUnitID string) (string, error) {
+// 	log.Println("Starting ClaimUnitByID function")
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Client ID: %s", clientID)
+
+// 	// Check if the unit is already claimed
+// 	claimedStatus, err := ctx.GetStub().GetState("CLAIMED_" + warehouseUnitID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if claimedStatus != nil {
+// 		log.Printf("Unit %s already claimed", warehouseUnitID)
+// 		return "unit already claimed", nil
+// 	}
+
+// 	// Fetch the unit from the database
+// 	log.Println("Fetching unit from database")
+// 	unit, err := fetchUnitByID(warehouseUnitID)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			log.Println("Unit does not exist in database")
+// 			return "unit does not exist", nil
+// 		}
+// 		log.Printf("Failed to fetch unit: %v", err)
+// 		return "", fmt.Errorf("failed to fetch unit: %v", err)
+// 	}
+// 	log.Printf("Fetched unit: %+v", unit)
+
+// 	// Check if the clientID matches the MarketplaceIdentifier
+// 	log.Printf("Checking if client ID matches MarketplaceIdentifier")
+// 	log.Printf("Client ID: %s, MarketplaceIdentifier: %s", clientID, unit.MarketplaceIdentifier.String)
+// 	if unit.MarketplaceIdentifier.String != clientID {
+// 		log.Printf("Caller is not authorized to claim the unit: %s", warehouseUnitID)
+// 		return "caller is not authorized to claim the unit", nil
+// 	}
+
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	i := 0
+// 	newID, err := generateUniqueID(ctx, i)
+// 	tradingPlatformID := newID
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+
+// 	// Check if TradingPlatformID already exists in the ledger
+// 	log.Printf("Checking if TradingPlatformID %s already exists in the ledger", tradingPlatformID)
+// 	existingTokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to check existing token in ledger: %v", err)
+// 		return "", fmt.Errorf("failed to check existing token in ledger: %v", err)
+// 	}
+// 	if existingTokenBytes != nil {
+// 		log.Printf("TradingPlatformID %s already exists in ledger", tradingPlatformID)
+// 		log.Printf("Existing token data for TradingPlatformID: %s", string(existingTokenBytes))
+// 		return "TradingPlatformID already exists in ledger", nil
+// 	}
+
+// 	// Get transaction timestamp
+// 	timestamp, err := ctx.GetStub().GetTxTimestamp()
+// 	if err != nil {
+// 		log.Printf("Failed to get transaction timestamp: %v", err)
+// 		return "", fmt.Errorf("failed to get transaction timestamp: %v", err)
+// 	}
+// 	claimedAt := timestamp.Seconds
+
+// 	// Create a token
+// 	unitData := concatenateUnitData(unit)
+// 	unitHash := hashUnitData(unitData)
+// 	token := &Token{
+// 		TradingPlatformID: tradingPlatformID,
+// 		WarehouseUnitID:   unit.WarehouseUnitID,
+// 		UnitHash:          unitHash,
+// 		Burned:            false,
+// 		Owner:             clientID,
+// 		Listed:            false,
+// 		UnitCount:         unit.UnitCount.Int64,
+// 		ClaimedAt:         claimedAt,
+// 	}
+// 	tokenBytes, err := json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+// 	log.Printf("Token marshaled: %s", string(tokenBytes))
+
+// 	// Save the token to the ledger
+// 	log.Println("Saving token to ledger")
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	// Mark the unit as claimed
+// 	log.Println("Marking the unit as claimed")
+// 	err = ctx.GetStub().PutState("CLAIMED_"+warehouseUnitID, []byte("claimed"))
+// 	if err != nil {
+// 		log.Printf("Failed to mark unit as claimed in world state: %v", err)
+// 		return "", fmt.Errorf("failed to mark unit as claimed in world state: %v", err)
+// 	}
+
+// 	log.Println("ClaimUnitByID function completed successfully")
+// 	return "unit successfully claimed", nil
+// }
+
+// // BurnToken marks a token as burned
+// func (m *MarketplaceChaincode) BurnToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, orgName, orgURL string) (string, error) {
+// 	log.Printf("Starting BurnToken function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "no state found for TradingPlatformID", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be burned", tradingPlatformID)
+// 		return "token is listed and cannot be burned", nil
+// 	}
+
+// 	// Mark the token as burned
+// 	token.Burned = true
+// 	token.BurnedByOrgName = orgName
+// 	token.BurnedByOrgURL = orgURL
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to put token to world state: %v", err)
+// 		return "", fmt.Errorf("failed to put token to world state: %v", err)
+// 	}
+
+// 	log.Printf("BurnToken function completed successfully for TradingPlatformID: %s", tradingPlatformID)
+// 	return "token successfully burned", nil
+// }
+
+// // TransferToken transfers a token to a new owner
+// func (m *MarketplaceChaincode) TransferToken(ctx contractapi.TransactionContextInterface, tradingPlatformID, newOwner string) (string, error) {
+// 	log.Println("Starting TransferToken function")
+
+// 	// Fetch the token from the ledger
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be transferred", tradingPlatformID)
+// 		return "token is burned and cannot be transferred", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be transferred", tradingPlatformID)
+// 		return "token is listed and cannot be transferred", nil
+// 	}
+
+// 	// Verify the caller is the owner or authorized entity
+// 	callerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller ID for transfer: %s", callerID)
+
+// 	if token.Owner != callerID && callerID != "marketplace-client-id" {
+// 		log.Printf("Caller %s is not the owner or authorized entity for token %s", callerID, tradingPlatformID)
+// 		return "caller is not authorized to transfer the token", nil
+// 	}
+
+// 	// Update the owner
+// 	token.Owner = newOwner
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Printf("TransferToken function completed successfully. New owner of token %s: %s", tradingPlatformID, newOwner)
+// 	return "token successfully transferred", nil
+// }
+
+// // ListToken lists a carbon credit token for sale
+// func (m *MarketplaceChaincode) ListToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string, price string, tokenName string) (string, error) {
+// 	log.Println("Starting ListToken function")
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to get token state: %v", err)
+// 		return "", fmt.Errorf("failed to get token state: %v", err)
+// 	}
+
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Log the current owner of the token
+// 	log.Printf("Current owner of token %s: %s", tradingPlatformID, token.Owner)
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be listed", tradingPlatformID)
+// 		return "token is burned and cannot be listed", nil
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Set the token as listed
+// 	token.Listed = true
+// 	token.ListedPrice = price
+// 	token.TokenName = tokenName
+
+// 	// Save the updated token to the ledger
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Println("ListToken function completed successfully")
+// 	return "token successfully listed", nil
+// }
+
+// // DelistToken removes a listed token from sale
+// func (m *MarketplaceChaincode) DelistToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting DelistToken function")
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Set the token as not listed
+// 	token.Listed = false
+// 	token.ListedPrice = ""
+// 	token.TokenName = ""
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Println("DelistToken function completed successfully")
+// 	return "token successfully delisted", nil
+// }
+
+// // BuyToken allows a buyer to purchase a listed carbon credit token
+// func (m *MarketplaceChaincode) BuyToken(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (string, error) {
+// 	log.Println("Starting BuyToken function")
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Verify the token is listed
+// 	if !token.Listed {
+// 		log.Printf("Token %s is not listed for sale", tradingPlatformID)
+// 		return "token is not listed for sale", nil
+// 	}
+
+// 	// Verify the buyer has enough tokens of the specified type
+// 	buyerID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Buyer client ID: %s", buyerID)
+
+// 	// Chaincode-to-chaincode query to get the buyer's balance from paymenttokenchaincode
+// 	response := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("GetBalance"), []byte(buyerID), []byte(token.TokenName)}, "mychannel")
+// 	if response.Status != 200 {
+// 		log.Printf("Failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 		return "", fmt.Errorf("failed to query buyer balance from paymenttokenchaincode: %s", response.Message)
+// 	}
+
+// 	var buyerBalance int
+// 	err = json.Unmarshal(response.Payload, &buyerBalance)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal buyer balance: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal buyer balance: %v", err)
+// 	}
+
+// 	price, err := strconv.Atoi(token.ListedPrice)
+// 	if err != nil {
+// 		log.Printf("Failed to convert listed price to int: %v", err)
+// 		return "", fmt.Errorf("failed to convert listed price to int: %v", err)
+// 	}
+
+// 	if buyerBalance < price {
+// 		log.Printf("Buyer %s has insufficient funds of %s", buyerID, token.TokenName)
+// 		return "buyer has insufficient funds", nil
+// 	}
+
+// 	// Transfer tokens from the buyer to the seller using paymenttokenchaincode
+// 	transferResponse := ctx.GetStub().InvokeChaincode("paymenttokenchaincode", [][]byte{[]byte("TransferTokens"), []byte(token.TokenName), []byte(token.Owner), []byte(strconv.Itoa(price))}, "mychannel")
+// 	if transferResponse.Status != 200 {
+// 		log.Printf("Failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 		return "", fmt.Errorf("failed to transfer tokens from buyer to seller: %s", transferResponse.Message)
+// 	}
+
+// 	// Set the token as not listed and update ownership
+// 	token.Listed = false
+// 	token.Owner = buyerID
+// 	token.ListedPrice = ""
+// 	token.TokenName = ""
+
+// 	tokenBytes, err = json.Marshal(token)
+// 	if err != nil {
+// 		log.Printf("Failed to marshal token: %v", err)
+// 		return "", fmt.Errorf("failed to marshal token: %v", err)
+// 	}
+
+// 	err = ctx.GetStub().PutState(tradingPlatformID, tokenBytes)
+// 	if err != nil {
+// 		log.Printf("Failed to update token in world state: %v", err)
+// 		return "", fmt.Errorf("failed to update token in world state: %v", err)
+// 	}
+
+// 	log.Println("BuyToken function completed successfully")
+// 	return "token successfully purchased", nil
+// }
+
+// // GetState retrieves the state of a specific unit from the ledger
+// func (m *MarketplaceChaincode) GetState(ctx contractapi.TransactionContextInterface, tradingPlatformID string) (*Token, error) {
+// 	log.Printf("Starting GetState function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return nil, fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No state found for TradingPlatformID: %s", tradingPlatformID)
+// 		return nil, fmt.Errorf("no state found for TradingPlatformID: %s", tradingPlatformID)
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return nil, fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	log.Printf("GetState function completed successfully for TradingPlatformID: %s. Token data: %+v", tradingPlatformID, token)
+// 	return &token, nil
+// }
+
+// // ListAllTokens retrieves all tokens from the ledger
+// func (m *MarketplaceChaincode) ListAllTokens(ctx contractapi.TransactionContextInterface) (string, error) {
+// 	log.Println("Starting ListAllTokens function")
+// 	startKey := ""
+// 	endKey := ""
+
+// 	resultsIterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	defer resultsIterator.Close()
+
+// 	var tokens []*Token
+// 	for resultsIterator.HasNext() {
+// 		queryResponse, err := resultsIterator.Next()
+// 		if err != nil {
+// 			return "", err
+// 		}
+
+// 		log.Printf("Raw query result: %s", string(queryResponse.Value))
+
+// 		var token Token
+// 		err = json.Unmarshal(queryResponse.Value, &token)
+// 		if err != nil {
+// 			log.Printf("Skipping non-token entry: %s", string(queryResponse.Value))
+// 			continue
+// 		}
+// 		tokens = append(tokens, &token)
+// 	}
+
+// 	tokenBytes, err := json.Marshal(tokens)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	log.Println("ListAllTokens function completed successfully")
+// 	return string(tokenBytes), nil
+// }
+
+// // concatenateUnitData concatenates all fields of a Unit into a single string
+// func concatenateUnitData(unit *Unit) string {
+// 	values := []string{
+// 		unit.UnitBlockStart.String,
+// 		unit.UnitBlockEnd.String,
+// 		fmt.Sprintf("%d", unit.UnitCount.Int64),
+// 		unit.WarehouseUnitID,
+// 		unit.IssuanceID.String,
+// 		unit.ProjectLocationID.String,
+// 		unit.OrgUID,
+// 		unit.UnitOwner.String,
+// 		unit.CountryJurisdictionOfOwner.String,
+// 		unit.InCountryJurisdictionOfOwner.String,
+// 		unit.SerialNumberBlock.String,
+// 		unit.SerialNumberPattern.String,
+// 		fmt.Sprintf("%d", unit.VintageYear.Int64),
+// 		unit.UnitType.String,
+// 		unit.Marketplace.String,
+// 		unit.MarketplaceLink.String,
+// 		unit.MarketplaceIdentifier.String,
+// 		unit.UnitTags.String,
+// 		unit.UnitStatus.String,
+// 		unit.UnitStatusReason.String,
+// 		unit.UnitRegistryLink.String,
+// 		unit.CorrespondingAdjustmentDeclaration.String,
+// 		unit.CorrespondingAdjustmentStatus.String,
+// 		fmt.Sprintf("%d", unit.TimeStaged.Int64),
+// 		unit.CreatedAt.String,
+// 		unit.UpdatedAt.String,
+// 	}
+// 	return strings.Join(values, "|")
+// }
+
+// // fetchUnitByID fetches a unit by its ID from the SQL database
+// func fetchUnitByID(warehouseUnitID string) (*Unit, error) {
+// 	row := db.QueryRow("SELECT unitBlockStart, unitBlockEnd, unitCount, warehouseUnitId, issuanceId, projectLocationId, orgUid, unitOwner, countryJurisdictionOfOwner, inCountryJurisdictionOfOwner, serialNumberBlock, serialNumberPattern, vintageYear, unitType, marketplace, marketplaceLink, marketplaceIdentifier, unitTags, unitStatus, unitStatusReason, unitRegistryLink, correspondingAdjustmentDeclaration, correspondingAdjustmentStatus, timeStaged, createdAt, updatedAt FROM units WHERE warehouseUnitID = ?", warehouseUnitID)
+// 	var unit Unit
+// 	err := row.Scan(
+// 		&unit.UnitBlockStart,
+// 		&unit.UnitBlockEnd,
+// 		&unit.UnitCount,
+// 		&unit.WarehouseUnitID,
+// 		&unit.IssuanceID,
+// 		&unit.ProjectLocationID,
+// 		&unit.OrgUID,
+// 		&unit.UnitOwner,
+// 		&unit.CountryJurisdictionOfOwner,
+// 		&unit.InCountryJurisdictionOfOwner,
+// 		&unit.SerialNumberBlock,
+// 		&unit.SerialNumberPattern,
+// 		&unit.VintageYear,
+// 		&unit.UnitType,
+// 		&unit.Marketplace,
+// 		&unit.MarketplaceLink,
+// 		&unit.MarketplaceIdentifier,
+// 		&unit.UnitTags,
+// 		&unit.UnitStatus,
+// 		&unit.UnitStatusReason,
+// 		&unit.UnitRegistryLink,
+// 		&unit.CorrespondingAdjustmentDeclaration,
+// 		&unit.CorrespondingAdjustmentStatus,
+// 		&unit.TimeStaged,
+// 		&unit.CreatedAt,
+// 		&unit.UpdatedAt,
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &unit, nil
+// }
+
+// // hashUnitData generates a SHA-256 hash of the unit data
+// func hashUnitData(data string) string {
+// 	hash := sha256.New()
+// 	hash.Write([]byte(data))
+// 	return hex.EncodeToString(hash.Sum(nil))
+// }
+
+// // generateUniqueID generates a unique ID based on the transaction timestamp and iterator
+// func generateUniqueID(ctx contractapi.TransactionContextInterface, iterator int) (string, error) {
+// 	// Generate TradingPlatformID using timestamp
+// 	log.Println("Generating TradingPlatformID using transaction timestamp")
+// 	timestamp, err := ctx.GetStub().GetTxTimestamp()
+// 	if err != nil {
+// 		log.Printf("Failed to get transaction timestamp: %v", err)
+// 		return "", fmt.Errorf("failed to get transaction timestamp: %v", err)
+// 	}
+// 	// Convert iterator to bytes and append to timestamp bytes
+// 	iteratorBytes := []byte(strconv.Itoa(iterator))
+// 	timeBytes := append([]byte(strconv.FormatInt(timestamp.Seconds, 10)), iteratorBytes...)
+// 	hash := sha256.New()
+// 	hash.Write(timeBytes)
+// 	tradingPlatformID := hex.EncodeToString(hash.Sum(nil))[:10] // Using first 10 characters of hash
+// 	log.Printf("Generated TradingPlatformID: %s", tradingPlatformID)
+// 	return tradingPlatformID, nil
+// }
+
+// // SplitUnits splits a unit into smaller units based on the provided ratio or division
+// func (m *MarketplaceChaincode) SplitUnits(ctx contractapi.TransactionContextInterface, tradingPlatformID string, method string, value int) (string, error) {
+// 	log.Printf("Starting SplitUnits function for TradingPlatformID: %s", tradingPlatformID)
+
+// 	tokenBytes, err := ctx.GetStub().GetState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to read from world state: %v", err)
+// 		return "", fmt.Errorf("failed to read from world state: %v", err)
+// 	}
+// 	if tokenBytes == nil {
+// 		log.Printf("No token found for TradingPlatformID: %s", tradingPlatformID)
+// 		return "token does not exist", nil
+// 	}
+
+// 	var token Token
+// 	err = json.Unmarshal(tokenBytes, &token)
+// 	if err != nil {
+// 		log.Printf("Failed to unmarshal token: %v", err)
+// 		return "", fmt.Errorf("failed to unmarshal token: %v", err)
+// 	}
+
+// 	// Verify the caller is the owner
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		log.Printf("Failed to get client identity: %v", err)
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Caller client ID: %s", clientID)
+// 	if token.Owner != clientID {
+// 		log.Printf("Caller is not the owner of token %s", tradingPlatformID)
+// 		return "caller is not the owner of the token", nil
+// 	}
+
+// 	// Verify the token is not listed
+// 	if token.Listed {
+// 		log.Printf("Token %s is listed and cannot be split", tradingPlatformID)
+// 		return "token is listed and cannot be split", nil
+// 	}
+
+// 	// Verify the token is not burned
+// 	if token.Burned {
+// 		log.Printf("Token %s is burned and cannot be split", tradingPlatformID)
+// 		return "token is burned and cannot be split", nil
+// 	}
+
+// 	log.Printf("Splitting token using method: %s, value: %d", method, value)
+// 	// Perform the split
+// 	var newTokens []*Token
+// 	switch method {
+// 	case "ratio":
+// 		// Split into two parts based on the ratio
+// 		firstPart := (token.UnitCount * int64(value)) / 100
+// 		secondPart := token.UnitCount - firstPart
+
+// 		log.Printf("First part: %d, Second part: %d", firstPart, secondPart)
+// 		for i := 0; i < 2; i++ {
+// 			newUnitCount := firstPart
+// 			if i == 1 {
+// 				newUnitCount = secondPart
+// 			}
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         newUnitCount,
+// 				ClaimedAt:         token.ClaimedAt,
+// 			})
+// 		}
+
+// 	case "divide":
+// 		// Split into equal parts
+// 		if value <= 0 || token.UnitCount%int64(value) != 0 {
+// 			return "", fmt.Errorf("invalid value for division")
+// 		}
+// 		partCount := token.UnitCount / int64(value)
+
+// 		log.Printf("Splitting into %d parts, each with %d units", value, partCount)
+// 		for i := 0; i < value; i++ {
+// 			newID, err := generateUniqueID(ctx, i)
+// 			if err != nil {
+// 				return "", fmt.Errorf("failed to generate unique ID: %v", err)
+// 			}
+// 			newTokens = append(newTokens, &Token{
+// 				TradingPlatformID: newID,
+// 				WarehouseUnitID:   token.WarehouseUnitID,
+// 				UnitHash:          token.UnitHash,
+// 				Burned:            false,
+// 				Owner:             clientID,
+// 				Listed:            false,
+// 				UnitCount:         partCount,
+// 				ClaimedAt:         token.ClaimedAt,
+// 			})
+// 		}
+
+// 	default:
+// 		return "", fmt.Errorf("invalid split method")
+// 	}
+
+// 	// Save the new tokens to the ledger
+// 	for _, newToken := range newTokens {
+// 		newTokenBytes, err := json.Marshal(newToken)
+// 		if err != nil {
+// 			log.Printf("Failed to marshal new token: %v", err)
+// 			return "", fmt.Errorf("failed to marshal new token: %v", err)
+// 		}
+
+// 		err = ctx.GetStub().PutState(newToken.TradingPlatformID, newTokenBytes)
+// 		if err != nil {
+// 			log.Printf("Failed to put new token to world state: %v", err)
+// 			return "", fmt.Errorf("failed to put new token to world state: %v", err)
+// 		}
+// 	}
+
+// 	// Delete the original token from the ledger
+// 	err = ctx.GetStub().DelState(tradingPlatformID)
+// 	if err != nil {
+// 		log.Printf("Failed to delete original token from world state: %v", err)
+// 		return "", fmt.Errorf("failed to delete original token from world state: %v", err)
+// 	}
+
+// 	log.Println("SplitUnits function completed successfully")
+// 	return "units successfully split", nil
+// }
+
+// func (m *MarketplaceChaincode) GetClientIdentity(ctx contractapi.TransactionContextInterface) (string, error) {
+// 	clientID, err := ctx.GetClientIdentity().GetID()
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to get client identity: %v", err)
+// 	}
+// 	log.Printf("Client ID: %s", clientID)
+// 	return clientID, nil
+// }
+
+// func main() {
+// 	if err := initializeDB(); err != nil {
+// 		log.Panicf("Failed to initialize database: %v", err)
+// 	}
+
+// 	chaincode, err := contractapi.NewChaincode(&MarketplaceChaincode{})
+// 	if err != nil {
+// 		log.Panicf("Error creating marketplace chaincode: %v", err)
+// 	}
+
+// 	if err := chaincode.Start(); err != nil {
+// 		log.Panicf("Error starting marketplace chaincode: %v", err)
+// 	}
+// }
